@@ -70,18 +70,32 @@ jobs:
         run: |
           artifact="dist/openminion-0.0.19-${{ matrix.target }}"
           if [ "${{ matrix.target }}" = "windows-x86_64" ]; then artifact="${artifact}.exe"; fi
-          start=$(python -c 'import time; print(time.time_ns())')
-          "$artifact" --version
-          first_end=$(python -c 'import time; print(time.time_ns())')
-          "$artifact" --help >/dev/null
-          warm_end=$(python -c 'import time; print(time.time_ns())')
-          python - "$start" "$first_end" "$warm_end" "${{ matrix.target }}" <<'PY'
-          import json, sys
+          host_python=$(command -v python)
+          empty_path="${{ runner.temp }}/empty-path"
+          mkdir -p "$empty_path"
+          start=$("$host_python" -c 'import time; print(time.time_ns())')
+          if [ "${{ matrix.target }}" = "macos-arm64" ]; then
+            /usr/bin/time -l env PATH="$empty_path" "$artifact" --version
+          elif [ "${{ matrix.target }}" = "linux-x86_64" ]; then
+            /usr/bin/time -v env PATH="$empty_path" "$artifact" --version
+          else
+            env PATH="$empty_path" "$artifact" --version
+          fi
+          first_end=$("$host_python" -c 'import time; print(time.time_ns())')
+          env PATH="$empty_path" "$artifact" --help >/dev/null
+          warm_end=$("$host_python" -c 'import time; print(time.time_ns())')
+          "$host_python" - "$start" "$first_end" "$warm_end" "${{ matrix.target }}" "$PYAPP_INSTALL_DIR_OPENMINION" <<'PY'
+          import json, pathlib, sys
           start, first_end, warm_end = map(int, sys.argv[1:4])
           print(json.dumps({
               "target": sys.argv[4],
               "first_launch_ms": (first_end - start) / 1_000_000,
               "warm_launch_ms": (warm_end - first_end) / 1_000_000,
+              "installed_size_bytes": sum(
+                  path.stat().st_size
+                  for path in pathlib.Path(sys.argv[5]).rglob("*")
+                  if path.is_file()
+              ),
           }))
           PY
       - uses: actions/upload-artifact@v7

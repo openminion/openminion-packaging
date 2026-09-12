@@ -54,6 +54,14 @@ class BuildContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "local wheel SHA-256 mismatch"):
                 build.verify_wheel(wheel, "local", "0" * 64)
 
+    def test_local_wheel_record_does_not_claim_official_source(self) -> None:
+        wheel = Path("openminion-local.whl")
+        record = build.wheel_record(wheel, "0.0.19", "local", "a" * 64)
+        self.assertEqual(record["origin"], f"local:{wheel.resolve()}")
+        self.assertNotIn("source", record)
+        self.assertNotIn("tag", record)
+        self.assertNotIn("commit", record)
+
     def test_pyapp_environment_is_offline_and_isolated(self) -> None:
         target = build.load_target("macos-arm64")
         values = build.pyapp_environment(

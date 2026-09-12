@@ -93,6 +93,24 @@ def verify_wheel(
     return version, requirements, actual_sha256
 
 
+def wheel_record(
+    wheel: Path, version: str, origin: str, wheel_sha256: str
+) -> dict[str, str]:
+    record = {
+        "version": version,
+        "filename": wheel.name,
+        "origin": OPENMINION_WHEEL_URL
+        if origin == "pypi"
+        else f"local:{wheel.resolve()}",
+        "sha256": wheel_sha256,
+    }
+    if origin == "pypi":
+        record.update(
+            source=OPENMINION_SOURCE, tag=OPENMINION_TAG, commit=OPENMINION_COMMIT
+        )
+    return record
+
+
 def load_target(target_name: str) -> dict[str, str]:
     inputs = json.loads(INPUTS_PATH.read_text())
     return inputs["targets"][target_name]
@@ -329,17 +347,7 @@ def build(
         "target": target_name,
         "profile": PROFILE,
         "publishing": False,
-        "wheel": {
-            "version": version,
-            "filename": wheel.name,
-            "origin": OPENMINION_WHEEL_URL
-            if origin == "pypi"
-            else f"local:{wheel.resolve()}",
-            "sha256": wheel_sha256,
-            "source": OPENMINION_SOURCE,
-            "tag": OPENMINION_TAG,
-            "commit": OPENMINION_COMMIT,
-        },
+        "wheel": wheel_record(wheel, version, origin, wheel_sha256),
         "python": {
             "version": json.loads(INPUTS_PATH.read_text())["python_version"],
             "archive_url": target["archive_url"],
