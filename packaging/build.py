@@ -116,12 +116,10 @@ def wheel_record(
     return record
 
 
-def dependency_find_links(wheel: Path | None) -> list[str]:
-    return [] if wheel is None else ["--find-links", str(wheel.parent.resolve())]
-
-
 def write_download_lock(lock: Path, output: Path, dependency_wheel: Path) -> None:
-    dependency_name = read_wheel_metadata(dependency_wheel)["Name"].lower()
+    dependency_name = (
+        read_wheel_metadata(dependency_wheel)["Name"].lower().replace("_", "-")
+    )
     lines: list[str] = []
     skip = False
     for line in lock.read_text().splitlines():
@@ -187,7 +185,8 @@ def write_lock(
             "--output-file",
             str(output_path),
         ]
-        command.extend(dependency_find_links(dependency_wheel))
+        if dependency_wheel is not None:
+            command.extend(["--find-links", str(dependency_wheel.parent.resolve())])
         run(command)
         generated = output_path.read_text()
     if check:

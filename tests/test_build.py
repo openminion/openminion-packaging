@@ -62,13 +62,6 @@ class BuildContractTests(unittest.TestCase):
         self.assertNotIn("tag", record)
         self.assertNotIn("commit", record)
 
-    def test_dependency_wheel_adds_one_local_source(self) -> None:
-        wheel = Path("wheelhouse/sophiagraph.whl")
-        self.assertEqual(
-            build.dependency_find_links(wheel),
-            ["--find-links", str(wheel.parent.resolve())],
-        )
-
     def test_download_lock_omits_local_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
