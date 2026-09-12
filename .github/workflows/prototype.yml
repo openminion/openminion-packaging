@@ -19,7 +19,7 @@ jobs:
             https://files.pythonhosted.org/packages/3d/bb/d6268e845a980ebf69052e0b8669edaee161e229c77a4752f506c6e0c6d8/openminion-0.0.19-py3-none-any.whl \
             --output wheel/openminion-0.0.19-py3-none-any.whl
           echo "4c2e7d30c3b993e24834d17e9881889a78987ee2a07f8e503d7f40fdca395112  wheel/openminion-0.0.19-py3-none-any.whl" | sha256sum --check
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: openminion-wheel
           path: wheel/openminion-0.0.19-py3-none-any.whl
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: openminion-wheel
           path: wheel
@@ -84,7 +84,7 @@ jobs:
               "warm_launch_ms": (warm_end - first_end) / 1_000_000,
           }))
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: openminion-${{ matrix.target }}-prototype
           path: |

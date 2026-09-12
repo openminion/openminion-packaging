@@ -54,12 +54,13 @@ def run(
     command: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None
 ) -> str:
     completed = subprocess.run(
-        command, cwd=cwd, env=env, check=True, text=True, capture_output=True
+        command, cwd=cwd, env=env, text=True, capture_output=True
     )
     if completed.stdout:
         print(completed.stdout, end="")
     if completed.stderr:
         print(completed.stderr, end="")
+    completed.check_returncode()
     return completed.stdout.strip()
 
 
