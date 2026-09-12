@@ -62,6 +62,36 @@ class BuildContractTests(unittest.TestCase):
         self.assertNotIn("tag", record)
         self.assertNotIn("commit", record)
 
+    def test_dependency_wheel_adds_one_local_source(self) -> None:
+        wheel = Path("wheelhouse/sophiagraph.whl")
+        self.assertEqual(
+            build.dependency_find_links(wheel),
+            ["--find-links", str(wheel.parent.resolve())],
+        )
+
+    def test_download_lock_omits_local_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            dependency = root / "sophiagraph.whl"
+            with ZipFile(dependency, "w", ZIP_DEFLATED) as archive:
+                archive.writestr(
+                    "sophiagraph-0.0.10.dist-info/METADATA",
+                    "Metadata-Version: 2.4\nName: sophiagraph\nVersion: 0.0.10\n",
+                )
+            lock = root / "requirements.txt"
+            lock.write_text(
+                "httpx==0.28.1 \\\n    --hash=sha256:aaa\n"
+                "sophiagraph==0.0.10 \\\n    --hash=sha256:bbb\n"
+                "typer==0.27.2 \\\n    --hash=sha256:ccc\n"
+            )
+            output = root / "download.txt"
+            build.write_download_lock(lock, output, dependency)
+            content = output.read_text()
+
+        self.assertNotIn("sophiagraph", content)
+        self.assertIn("httpx==0.28.1", content)
+        self.assertIn("typer==0.27.2", content)
+
     def test_pyapp_environment_is_offline_and_isolated(self) -> None:
         target = build.load_target("macos-arm64")
         values = build.pyapp_environment(

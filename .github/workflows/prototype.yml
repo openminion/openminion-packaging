@@ -11,6 +11,14 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: openminion/sophiagraph
+          ref: b665812a329546eb0a7336f28b2e00643f93043a
+          path: sophiagraph-source
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
       - name: Download exact OpenMinion wheel
         shell: bash
         run: |
@@ -19,10 +27,18 @@ jobs:
             https://files.pythonhosted.org/packages/3d/bb/d6268e845a980ebf69052e0b8669edaee161e229c77a4752f506c6e0c6d8/openminion-0.0.19-py3-none-any.whl \
             --output wheel/openminion-0.0.19-py3-none-any.whl
           echo "4c2e7d30c3b993e24834d17e9881889a78987ee2a07f8e503d7f40fdca395112  wheel/openminion-0.0.19-py3-none-any.whl" | sha256sum --check
+      - name: Build Windows-compatible Sophiagraph prototype wheel
+        shell: bash
+        env:
+          SOURCE_DATE_EPOCH: "1789235469"
+        run: |
+          python -m pip install build==1.5.0 setuptools==84.0.0 wheel==0.48.0
+          python -m build --wheel --no-isolation --outdir wheel sophiagraph-source
+          echo "152bc782b4715bd0580d2efee5890608b2a65d031a5559b9adc135f7b0d5115e  wheel/sophiagraph-0.0.10-py3-none-any.whl" | sha256sum --check
       - uses: actions/upload-artifact@v7
         with:
           name: openminion-wheel
-          path: wheel/openminion-0.0.19-py3-none-any.whl
+          path: wheel/*.whl
           retention-days: 3
 
   build:
@@ -56,8 +72,8 @@ jobs:
       - name: Verify lock and build
         shell: bash
         run: |
-          python packaging/build.py lock --target "${{ matrix.target }}" --wheel wheel/openminion-0.0.19-py3-none-any.whl --check
-          python packaging/build.py build --target "${{ matrix.target }}" --wheel wheel/openminion-0.0.19-py3-none-any.whl
+          python packaging/build.py lock --target "${{ matrix.target }}" --wheel wheel/openminion-0.0.19-py3-none-any.whl --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl --check
+          python packaging/build.py build --target "${{ matrix.target }}" --wheel wheel/openminion-0.0.19-py3-none-any.whl --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl
       - name: Prototype first and warm launch
         shell: bash
         env:

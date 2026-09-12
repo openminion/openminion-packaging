@@ -23,3 +23,6 @@ artifacts and are never committed.
 The manual prototype workflow builds unsigned, non-release artifacts. It does
 not publish them.
 
+The current prototype uses the exact `sophiagraph` commit recorded in the
+workflow to prove the Windows filename correction before its next PyPI release.
+That source-built dependency is nonpublishing prototype input only.

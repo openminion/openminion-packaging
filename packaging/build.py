@@ -12,6 +12,7 @@ import subprocess
 import tarfile
 import tempfile
 import urllib.request
+from email.message import Message
 from email.parser import Parser
 from pathlib import Path
 from zipfile import ZipFile
@@ -64,12 +65,16 @@ def run(
     return completed.stdout.strip()
 
 
-def wheel_metadata(wheel: Path) -> tuple[str, list[str]]:
+def read_wheel_metadata(wheel: Path) -> Message:
     with ZipFile(wheel) as archive:
         metadata_path = next(
             name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
         )
-        metadata = Parser().parsestr(archive.read(metadata_path).decode())
+        return Parser().parsestr(archive.read(metadata_path).decode())
+
+
+def wheel_metadata(wheel: Path) -> tuple[str, list[str]]:
+    metadata = read_wheel_metadata(wheel)
     requirements = [
         item for item in metadata.get_all("Requires-Dist", []) if "extra ==" not in item
     ]
@@ -111,6 +116,23 @@ def wheel_record(
     return record
 
 
+def dependency_find_links(wheel: Path | None) -> list[str]:
+    return [] if wheel is None else ["--find-links", str(wheel.parent.resolve())]
+
+
+def write_download_lock(lock: Path, output: Path, dependency_wheel: Path) -> None:
+    dependency_name = read_wheel_metadata(dependency_wheel)["Name"].lower()
+    lines: list[str] = []
+    skip = False
+    for line in lock.read_text().splitlines():
+        if line and not line[0].isspace():
+            name = line.split("==", 1)[0].lower().replace("_", "-")
+            skip = name == dependency_name
+        if not skip:
+            lines.append(line)
+    output.write_text("\n".join(lines) + "\n")
+
+
 def load_target(target_name: str) -> dict[str, str]:
     inputs = json.loads(INPUTS_PATH.read_text())
     return inputs["targets"][target_name]
@@ -132,7 +154,11 @@ def require_native_host(target_name: str) -> None:
 
 
 def write_lock(
-    target_name: str, wheel: Path, requirements: list[str], check: bool
+    target_name: str,
+    wheel: Path,
+    requirements: list[str],
+    check: bool,
+    dependency_wheel: Path | None,
 ) -> None:
     uv_version = run(["uv", "--version"]).split()[1]
     if uv_version != UV_VERSION:
@@ -143,26 +169,26 @@ def write_lock(
         input_path = Path(temp_dir) / "requirements.in"
         output_path = Path(temp_dir) / "requirements.txt"
         input_path.write_text("\n".join(requirements) + "\n")
-        run(
-            [
-                "uv",
-                "--quiet",
-                "pip",
-                "compile",
-                str(input_path),
-                "--generate-hashes",
-                "--no-annotate",
-                "--no-header",
-                "--only-binary",
-                ":all:",
-                "--python-version",
-                "3.11",
-                "--python-platform",
-                target["uv_platform"],
-                "--output-file",
-                str(output_path),
-            ]
-        )
+        command = [
+            "uv",
+            "--quiet",
+            "pip",
+            "compile",
+            str(input_path),
+            "--generate-hashes",
+            "--no-annotate",
+            "--no-header",
+            "--only-binary",
+            ":all:",
+            "--python-version",
+            "3.11",
+            "--python-platform",
+            target["uv_platform"],
+            "--output-file",
+            str(output_path),
+        ]
+        command.extend(dependency_find_links(dependency_wheel))
+        run(command)
         generated = output_path.read_text()
     if check:
         if lock_path.read_text() != generated:
@@ -194,27 +220,37 @@ def extract_python(archive: Path, work_dir: Path) -> Path:
 
 
 def populate_runtime(
-    runtime: Path, target: dict[str, str], lock: Path, wheel: Path, work_dir: Path
+    runtime: Path,
+    target: dict[str, str],
+    lock: Path,
+    wheel: Path,
+    dependency_wheel: Path | None,
+    work_dir: Path,
 ) -> tuple[Path, list[dict[str, str]]]:
     relative_python = Path(target["python_path"]).relative_to("runtime")
     python = runtime / relative_python
     wheelhouse = work_dir / "wheelhouse"
     wheelhouse.mkdir()
-    run(
-        [
-            str(python),
-            "-m",
-            "pip",
-            "download",
-            "--require-hashes",
-            "--only-binary",
-            ":all:",
-            "--dest",
-            str(wheelhouse),
-            "-r",
-            str(lock),
-        ]
-    )
+    download_lock = lock
+    if dependency_wheel is not None:
+        download_lock = work_dir / "download-requirements.txt"
+        write_download_lock(lock, download_lock, dependency_wheel)
+    download_command = [
+        str(python),
+        "-m",
+        "pip",
+        "download",
+        "--require-hashes",
+        "--only-binary",
+        ":all:",
+        "--dest",
+        str(wheelhouse),
+        "-r",
+        str(download_lock),
+    ]
+    run(download_command)
+    if dependency_wheel is not None:
+        shutil.copy2(dependency_wheel, wheelhouse / dependency_wheel.name)
     manifest = [
         {"filename": item.name, "sha256": sha256(item)}
         for item in sorted(wheelhouse.iterdir())
@@ -294,6 +330,7 @@ def build(
     wheel: Path,
     origin: str,
     expected_sha256: str | None,
+    dependency_wheel: Path | None,
     output_dir: Path,
 ) -> None:
     require_native_host(target_name)
@@ -312,7 +349,9 @@ def build(
     python_archive = work_dir / Path(target["archive_url"]).name
     download(target["archive_url"], python_archive, target["archive_sha256"])
     runtime = extract_python(python_archive, work_dir)
-    python, wheelhouse = populate_runtime(runtime, target, lock, wheel, work_dir)
+    python, wheelhouse = populate_runtime(
+        runtime, target, lock, wheel, dependency_wheel, work_dir
+    )
     distribution = work_dir / f"openminion-runtime-{target_name}.tar.gz"
     archive_runtime(runtime, distribution)
 
@@ -348,6 +387,14 @@ def build(
         "profile": PROFILE,
         "publishing": False,
         "wheel": wheel_record(wheel, version, origin, wheel_sha256),
+        "prototype_dependency_wheel": (
+            None
+            if dependency_wheel is None
+            else {
+                "filename": dependency_wheel.name,
+                "sha256": sha256(dependency_wheel),
+            }
+        ),
         "python": {
             "version": json.loads(INPUTS_PATH.read_text())["python_version"],
             "archive_url": target["archive_url"],
@@ -399,6 +446,7 @@ def parser() -> argparse.ArgumentParser:
             "--wheel-origin", choices=("pypi", "local"), default="pypi"
         )
         subparser.add_argument("--wheel-sha256")
+        subparser.add_argument("--dependency-wheel", type=Path)
     subparsers.choices["lock"].add_argument("--check", action="store_true")
     subparsers.choices["build"].add_argument(
         "--output-dir", type=Path, default=ROOT / "dist"
@@ -412,12 +460,23 @@ def main() -> None:
         args.wheel, args.wheel_origin, args.wheel_sha256
     )
     if args.command == "lock":
-        write_lock(args.target, args.wheel, requirements, args.check)
+        write_lock(
+            args.target,
+            args.wheel,
+            requirements,
+            args.check,
+            args.dependency_wheel,
+        )
         return
     if version != OPENMINION_VERSION and args.wheel_origin == "pypi":
         raise ValueError(f"expected OpenMinion {OPENMINION_VERSION}")
     build(
-        args.target, args.wheel, args.wheel_origin, args.wheel_sha256, args.output_dir
+        args.target,
+        args.wheel,
+        args.wheel_origin,
+        args.wheel_sha256,
+        args.dependency_wheel,
+        args.output_dir,
     )
 
 
