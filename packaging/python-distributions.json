@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "python_version": "3.11.16",
+  "release": "20260901",
+  "targets": {
+    "macos-arm64": {
+      "os": "macos",
+      "architecture": "arm64",
+      "minimum_os": "14",
+      "uv_platform": "aarch64-apple-darwin",
+      "archive_url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.11.16%2B20260901-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "archive_sha256": "768f05cf200273bbdda9a5955a5a6892a4b22f2a0b1e4b0a9160f5c7fce86816",
+      "python_path": "runtime/bin/python3",
+      "site_packages_path": "runtime/lib/python3.11/site-packages",
+      "binary_name": "openminion"
+    },
+    "windows-x86_64": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "minimum_os": "11",
+      "uv_platform": "x86_64-pc-windows-msvc",
+      "archive_url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.11.16%2B20260901-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "archive_sha256": "06cbe479e039f5b9cb5640c286d790074d63f549f92a32d599a3748293bd4510",
+      "python_path": "runtime/python.exe",
+      "site_packages_path": "runtime/Lib/site-packages",
+      "binary_name": "openminion.exe"
+    },
+    "linux-x86_64": {
+      "os": "linux",
+      "architecture": "x86_64",
+      "minimum_os": "glibc 2.35",
+      "cpu_level": "x86-64-v1",
+      "uv_platform": "x86_64-manylinux_2_35",
+      "archive_url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.11.16%2B20260901-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "archive_sha256": "64427febea27864d136db46c8efe968eb6fa5ca2813ce1dca4bb95aec31cb2e4",
+      "python_path": "runtime/bin/python3",
+      "site_packages_path": "runtime/lib/python3.11/site-packages",
+      "binary_name": "openminion"
+    }
+  }
+}
+
