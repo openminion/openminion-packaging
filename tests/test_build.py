@@ -30,6 +30,36 @@ Requires-Dist: scrapling>=0.2.0; extra == \"fetch-scrapling\"
 
 
 class BuildContractTests(unittest.TestCase):
+    def test_repository_documentation_surface_is_complete(self) -> None:
+        root = Path(__file__).parents[1]
+        root_docs = {
+            "API_COMPATIBILITY.md",
+            "CHANGELOG.md",
+            "CODE_OF_CONDUCT.md",
+            "CODE_QUALITY.md",
+            "CONTRIBUTING.md",
+            "LICENSE",
+            "NOTICE",
+            "README.md",
+            "RELEASING.md",
+            "SECURITY.md",
+            "SUPPORT.md",
+        }
+        package_docs = {
+            "README.md",
+            "certification-readiness-matrix.md",
+            "code-quality-enforcement.md",
+            "engineering-patterns.md",
+            "getting-started.md",
+            "source-tree-owner-map.md",
+            "testing-and-validation.md",
+        }
+
+        self.assertTrue(root_docs.issubset({path.name for path in root.iterdir()}))
+        self.assertTrue(
+            package_docs.issubset({path.name for path in (root / "docs").iterdir()})
+        )
+
     def test_wheel_metadata_keeps_only_core_requirements(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             wheel = Path(temp_dir) / "openminion.whl"

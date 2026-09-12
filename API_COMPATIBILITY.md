@@ -1,0 +1,34 @@
+# OpenMinion Packaging Compatibility Policy
+
+Owner: `openminion-packaging`
+Status: private prototype
+Scope: build entrypoints, target identifiers, and emitted artifact metadata
+
+## Supported operator surface
+
+The repository currently exposes two maintained commands:
+
+```bash
+python3.11 packaging/build.py lock --help
+python3.11 packaging/build.py build --help
+```
+
+The maintained target identifiers are `macos-arm64`, `linux-x86_64`, and
+`windows-x86_64`. Their exact toolchain, Python distribution, and lock inputs
+are repository-owned data.
+
+## Stability
+
+This is a private prototype, so the command and metadata contracts may change.
+Changes must update the README, package docs, tests, and changelog together.
+
+Only command-line behavior and emitted artifact metadata are compatibility
+surfaces. Functions inside `packaging/build.py`, workflow step names, tests,
+temporary directories, and generated files are internal implementation details.
+
+## Boundary
+
+This repository does not define OpenMinion runtime APIs, configuration formats,
+plugin contracts, or Desktop behavior. Those remain owned by their source
+repositories. A successful prototype build is not a public support or release
+claim.
