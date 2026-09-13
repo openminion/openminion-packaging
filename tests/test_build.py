@@ -92,6 +92,28 @@ class BuildContractTests(unittest.TestCase):
         self.assertNotIn("tag", record)
         self.assertNotIn("commit", record)
 
+    def test_checksum_file_is_portable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            artifact = root / "openminion.exe"
+            checksum = root / "openminion.exe.sha256"
+            artifact.write_bytes(b"artifact")
+            build.write_checksum(artifact, checksum)
+
+            self.assertEqual(
+                checksum.read_bytes(),
+                f"{build.sha256(artifact)}  openminion.exe\n".encode(),
+            )
+
+    def test_lock_files_use_canonical_line_endings(self) -> None:
+        attributes = BUILD_PATH.parents[1] / ".gitattributes"
+        self.assertIn(
+            "packaging/locks/*.txt text eol=lf",
+            attributes.read_text().splitlines(),
+        )
+        for lock in build.LOCKS_DIR.glob("*.txt"):
+            self.assertNotIn(b"\r\n", lock.read_bytes())
+
     def test_download_lock_omits_local_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -51,6 +51,10 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def write_checksum(artifact: Path, destination: Path) -> None:
+    destination.write_bytes(f"{sha256(artifact)}  {artifact.name}\n".encode())
+
+
 def run(
     command: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None
 ) -> str:
@@ -424,9 +428,7 @@ def build(
     }
     metadata_path = output_dir / f"{artifact.name}.json"
     metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
-    (output_dir / f"{artifact.name}.sha256").write_text(
-        f"{sha256(artifact)}  {artifact.name}\n"
-    )
+    write_checksum(artifact, output_dir / f"{artifact.name}.sha256")
     print(f"built {artifact}")
 
 

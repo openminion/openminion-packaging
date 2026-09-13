@@ -1,5 +1,7 @@
 dist/
 wheel/
+.DS_Store
+.openminion/
 .venv/
 .pytest_cache/
 .ruff_cache/
