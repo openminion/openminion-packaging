@@ -22,15 +22,15 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUTS_PATH = ROOT / "packaging" / "python-distributions.json"
 LOCKS_DIR = ROOT / "packaging" / "locks"
 
-OPENMINION_VERSION = "0.0.19"
-OPENMINION_WHEEL = "openminion-0.0.19-py3-none-any.whl"
+OPENMINION_VERSION = "0.0.20"
+OPENMINION_WHEEL = "openminion-0.0.20-py3-none-any.whl"
 OPENMINION_WHEEL_SHA256 = (
-    "4c2e7d30c3b993e24834d17e9881889a78987ee2a07f8e503d7f40fdca395112"
+    "a305a2a89f7fd4c8e43c1eba3268e435c57ab5c02b5042a0d33ea87e180262e7"
 )
-OPENMINION_WHEEL_URL = "https://files.pythonhosted.org/packages/3d/bb/d6268e845a980ebf69052e0b8669edaee161e229c77a4752f506c6e0c6d8/openminion-0.0.19-py3-none-any.whl"
+OPENMINION_WHEEL_URL = "https://files.pythonhosted.org/packages/5e/1b/9dbdd72266c972038889c7be10cf41faf81792307a2df184d1a6ee853eb8/openminion-0.0.20-py3-none-any.whl"
 OPENMINION_SOURCE = "https://github.com/openminion/openminion"
-OPENMINION_TAG = "v0.0.19"
-OPENMINION_COMMIT = "ead891854930ed78d034b0ae41aedc7d40b86224"
+OPENMINION_TAG = "v0.0.20"
+OPENMINION_COMMIT = "5027c2a81af36785b96e7c6005c0606644725707"
 
 PYAPP_VERSION = "0.29.0"
 PYAPP_SOURCE = "https://github.com/ofek/pyapp"
@@ -53,6 +53,22 @@ def sha256(path: Path) -> str:
 
 def write_checksum(artifact: Path, destination: Path) -> None:
     destination.write_bytes(f"{sha256(artifact)}  {artifact.name}\n".encode())
+
+
+def verify_artifact(artifact: Path) -> None:
+    metadata = json.loads(artifact.with_name(f"{artifact.name}.json").read_text())
+    actual_sha256 = sha256(artifact)
+    expected = metadata["artifact"]
+    if expected != {
+        "filename": artifact.name,
+        "sha256": actual_sha256,
+        "size_bytes": artifact.stat().st_size,
+    }:
+        raise ValueError("artifact metadata does not match the executable")
+    checksum = artifact.with_name(f"{artifact.name}.sha256").read_text()
+    if checksum != f"{actual_sha256}  {artifact.name}\n":
+        raise ValueError("artifact checksum does not match the executable")
+    print(f"verified {artifact}")
 
 
 def run(
@@ -452,11 +468,16 @@ def parser() -> argparse.ArgumentParser:
     subparsers.choices["build"].add_argument(
         "--output-dir", type=Path, default=ROOT / "dist"
     )
+    verify = subparsers.add_parser("verify")
+    verify.add_argument("--artifact", required=True, type=Path)
     return argument_parser
 
 
 def main() -> None:
     args = parser().parse_args()
+    if args.command == "verify":
+        verify_artifact(args.artifact)
+        return
     version, requirements, _ = verify_wheel(
         args.wheel, args.wheel_origin, args.wheel_sha256
     )

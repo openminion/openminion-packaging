@@ -24,9 +24,9 @@ jobs:
         run: |
           mkdir wheel
           curl --fail --location --silent --show-error \
-            https://files.pythonhosted.org/packages/3d/bb/d6268e845a980ebf69052e0b8669edaee161e229c77a4752f506c6e0c6d8/openminion-0.0.19-py3-none-any.whl \
-            --output wheel/openminion-0.0.19-py3-none-any.whl
-          echo "4c2e7d30c3b993e24834d17e9881889a78987ee2a07f8e503d7f40fdca395112  wheel/openminion-0.0.19-py3-none-any.whl" | sha256sum --check
+            https://files.pythonhosted.org/packages/5e/1b/9dbdd72266c972038889c7be10cf41faf81792307a2df184d1a6ee853eb8/openminion-0.0.20-py3-none-any.whl \
+            --output wheel/openminion-0.0.20-py3-none-any.whl
+          echo "a305a2a89f7fd4c8e43c1eba3268e435c57ab5c02b5042a0d33ea87e180262e7  wheel/openminion-0.0.20-py3-none-any.whl" | sha256sum --check
       - name: Build Windows-compatible Sophiagraph prototype wheel
         shell: bash
         env:
@@ -72,20 +72,29 @@ jobs:
       - name: Verify lock and build
         shell: bash
         run: |
-          python packaging/build.py lock --target "${{ matrix.target }}" --wheel wheel/openminion-0.0.19-py3-none-any.whl --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl --check
-          python packaging/build.py build --target "${{ matrix.target }}" --wheel wheel/openminion-0.0.19-py3-none-any.whl --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl
-      - name: Prototype first and warm launch
+          python packaging/build.py lock --target "${{ matrix.target }}" --wheel wheel/openminion-0.0.20-py3-none-any.whl --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl --check
+          python packaging/build.py build --target "${{ matrix.target }}" --wheel wheel/openminion-0.0.20-py3-none-any.whl --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl
+          artifact="dist/openminion-0.0.20-${{ matrix.target }}"
+          if [ "${{ matrix.target }}" = "windows-x86_64" ]; then artifact="${artifact}.exe"; fi
+          python packaging/build.py verify --artifact "$artifact"
+      - name: Prototype launch and offline runtime smoke
         shell: bash
         env:
-          OPENMINION_HOME: ${{ runner.temp }}/openminion-home
-          OPENMINION_DATA_ROOT: ${{ runner.temp }}/openminion-data
-          PYAPP_INSTALL_DIR_OPENMINION: ${{ runner.temp }}/openminion-install
+          OPENMINION_HOME: ${{ runner.temp }}/OpenMinion Home
+          OPENMINION_DATA_ROOT: ${{ runner.temp }}/OpenMinion Data
+          PYAPP_INSTALL_DIR_OPENMINION: ${{ runner.temp }}/OpenMinion Installed
           HTTP_PROXY: http://127.0.0.1:9
           HTTPS_PROXY: http://127.0.0.1:9
           ALL_PROXY: http://127.0.0.1:9
         run: |
-          artifact="dist/openminion-0.0.19-${{ matrix.target }}"
-          if [ "${{ matrix.target }}" = "windows-x86_64" ]; then artifact="${artifact}.exe"; fi
+          source_artifact="dist/openminion-0.0.20-${{ matrix.target }}"
+          if [ "${{ matrix.target }}" = "windows-x86_64" ]; then source_artifact="${source_artifact}.exe"; fi
+          launch_dir="${{ runner.temp }}/OpenMinion Prototype"
+          mkdir -p "$launch_dir"
+          artifact="$launch_dir/$(basename "$source_artifact")"
+          cp "$source_artifact" "$artifact"
+          chmod +x "$artifact"
+
           host_python=$(command -v python)
           empty_path="${{ runner.temp }}/empty-path"
           mkdir -p "$empty_path"
@@ -100,6 +109,20 @@ jobs:
           first_end=$("$host_python" -c 'import time; print(time.time_ns())')
           env PATH="$empty_path" "$artifact" --help >/dev/null
           warm_end=$("$host_python" -c 'import time; print(time.time_ns())')
+
+          smoke_dir="${{ runner.temp }}/OpenMinion Smoke"
+          mkdir -p "$smoke_dir"
+          printf '%s\n' '{"agents":{"openminion":{"name":"openminion","provider":"echo"}},"providers":{"echo":{"model":"echo"}}}' > "$smoke_dir/config.json"
+          for attempt in first second; do
+            env PATH="$empty_path" "$artifact" \
+              --home-root "$OPENMINION_HOME" \
+              --data-root "$OPENMINION_DATA_ROOT" \
+              --config "$smoke_dir/config.json" \
+              doctor --json \
+              > "$smoke_dir/doctor-$attempt.json" \
+              2> "$smoke_dir/doctor-$attempt.stderr"
+          done
+
           "$host_python" - "$start" "$first_end" "$warm_end" "${{ matrix.target }}" "$PYAPP_INSTALL_DIR_OPENMINION" <<'PY'
           import json, pathlib, sys
           start, first_end, warm_end = map(int, sys.argv[1:4])
@@ -114,10 +137,25 @@ jobs:
               ),
           }))
           PY
+          "$host_python" - "$smoke_dir" "$OPENMINION_DATA_ROOT" <<'PY'
+          import json, pathlib, sys
+          smoke_dir, data_root = map(pathlib.Path, sys.argv[1:3])
+          for attempt in ("first", "second"):
+              payload = json.loads((smoke_dir / f"doctor-{attempt}.json").read_text())
+              if not payload["summary"]["ok"]:
+                  raise SystemExit(f"doctor {attempt} reported failure")
+              stderr = (smoke_dir / f"doctor-{attempt}.stderr").read_text()
+              if "storage.schema_drift_detected" in stderr or "Traceback" in stderr:
+                  raise SystemExit(f"doctor {attempt} emitted a runtime failure")
+          for relative in ("state/openminion.db", "memory/memory.db"):
+              if not (data_root / relative).is_file():
+                  raise SystemExit(f"missing runtime state: {relative}")
+          print("offline runtime smoke passed twice")
+          PY
       - uses: actions/upload-artifact@v7
         with:
           name: openminion-${{ matrix.target }}-prototype
           path: |
-            dist/openminion-0.0.19-${{ matrix.target }}*
+            dist/openminion-0.0.20-${{ matrix.target }}*
             !dist/work-*/**
           retention-days: 3

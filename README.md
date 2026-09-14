@@ -37,13 +37,13 @@ run:
 ```bash
 python3.11 packaging/build.py lock \
   --target macos-arm64 \
-  --wheel wheel/openminion-0.0.19-py3-none-any.whl \
+  --wheel wheel/openminion-0.0.20-py3-none-any.whl \
   --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl \
   --check
 
 python3.11 packaging/build.py build \
   --target macos-arm64 \
-  --wheel wheel/openminion-0.0.19-py3-none-any.whl \
+  --wheel wheel/openminion-0.0.20-py3-none-any.whl \
   --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl
 ```
 

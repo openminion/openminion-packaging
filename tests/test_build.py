@@ -86,7 +86,7 @@ class BuildContractTests(unittest.TestCase):
 
     def test_local_wheel_record_does_not_claim_official_source(self) -> None:
         wheel = Path("openminion-local.whl")
-        record = build.wheel_record(wheel, "0.0.19", "local", "a" * 64)
+        record = build.wheel_record(wheel, "0.0.20", "local", "a" * 64)
         self.assertEqual(record["origin"], f"local:{wheel.resolve()}")
         self.assertNotIn("source", record)
         self.assertNotIn("tag", record)
@@ -104,6 +104,37 @@ class BuildContractTests(unittest.TestCase):
                 checksum.read_bytes(),
                 f"{build.sha256(artifact)}  openminion.exe\n".encode(),
             )
+
+    def test_artifact_verification_checks_metadata_and_checksum(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact = Path(temp_dir) / "openminion.exe"
+            artifact.write_bytes(b"artifact")
+            digest = build.sha256(artifact)
+            artifact.with_name("openminion.exe.json").write_text(
+                json.dumps(
+                    {
+                        "artifact": {
+                            "filename": artifact.name,
+                            "sha256": digest,
+                            "size_bytes": artifact.stat().st_size,
+                        }
+                    }
+                )
+            )
+            build.write_checksum(artifact, artifact.with_name("openminion.exe.sha256"))
+
+            build.verify_artifact(artifact)
+
+            artifact.write_bytes(b"changed")
+            with self.assertRaisesRegex(ValueError, "metadata"):
+                build.verify_artifact(artifact)
+
+            artifact.write_bytes(b"artifact")
+            artifact.with_name("openminion.exe.sha256").write_text(
+                f"{'0' * 64}  {artifact.name}\n"
+            )
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                build.verify_artifact(artifact)
 
     def test_lock_files_use_canonical_line_endings(self) -> None:
         attributes = BUILD_PATH.parents[1] / ".gitattributes"

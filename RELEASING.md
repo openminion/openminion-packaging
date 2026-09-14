@@ -1,7 +1,7 @@
 # OpenMinion Standalone Packaging Releases
 
 Status: prototype only
-Last updated: 2026-09-12
+Last updated: 2026-09-13
 
 This repository does not currently publish production artifacts. The manual
 `Prototype` workflow produces unsigned temporary evidence only.
@@ -13,9 +13,11 @@ Before reviewing a packaging change:
 1. run `make check`,
 2. verify the exact official OpenMinion wheel and dependency inputs,
 3. run the manual workflow from the commit being reviewed,
-4. require successful native builds and clean-path launches for every target,
-5. record artifact hashes, sizes, toolchain identities, and timing evidence,
-6. test the Windows artifact separately on the declared Windows 11 support
+4. require successful native builds, relocated-path launches, and two-pass
+   offline runtime smoke checks for every target,
+5. verify generated artifact metadata and checksums before upload,
+6. record artifact hashes, sizes, toolchain identities, and timing evidence,
+7. test the Windows artifact separately on the declared Windows 11 support
    floor.
 
 ## Production release gate

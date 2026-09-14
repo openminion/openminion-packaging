@@ -7,9 +7,10 @@ Status: private prototype
 | Repository documentation and governance | Root policies and package-local guides are present and structurally tested. | Ready |
 | Local code-quality gate | Ruff, unit tests, and actionlint are grouped under `make check`. | Ready |
 | Reproducible input contract | Wheel versions, hashes, dependency locks, and target runtime hashes are explicit. | Ready |
-| Native macOS ARM64 prototype | GitHub native-runner build and smoke test completed. | Ready |
-| Native Linux x86-64 prototype | GitHub native-runner build and smoke test completed. | Ready |
-| Native Windows x86-64 prototype | GitHub native-runner build and smoke test completed. | Ready |
+| Native macOS ARM64 prototype | The prior version passed; the 0.0.20 build requires refreshed workflow evidence. | Pending workflow evidence |
+| Native Linux x86-64 prototype | The prior version passed; the 0.0.20 build requires refreshed workflow evidence. | Pending workflow evidence |
+| Native Windows x86-64 prototype | The prior version passed; the 0.0.20 build requires refreshed workflow evidence. | Pending workflow evidence |
+| Offline packaged-runtime smoke | Metadata, relocation, first/repeat runtime startup, state initialization, and schema-drift checks are enforced on every prototype target. | Pending workflow evidence |
 | Official corrected Sophiagraph wheel | The current source-built wheel is a nonpublishing bridge. | Pending |
 | Disposable Windows 11 acceptance | End-user launch and command flow have not been certified on a clean host. | Pending |
 | Windows build-time budget | Prototype timing needs a release-owner decision. | Pending |

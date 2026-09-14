@@ -31,7 +31,13 @@ prove that an executable runs correctly on every target.
 
 Use the manual GitHub `Prototype` workflow for the three-target matrix. A
 successful run proves that the pinned inputs build on native GitHub runners and
-that the temporary artifacts pass the workflow smoke checks.
+that each temporary artifact:
+
+- matches its generated metadata and checksum,
+- launches from a path containing spaces without a host Python on `PATH`,
+- starts and reopens an isolated local runtime without network access,
+- initializes the expected state and memory databases, and
+- reports no storage schema drift or traceback during those checks.
 
 The following remain separate from a green prototype workflow:
 
