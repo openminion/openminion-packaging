@@ -10,7 +10,6 @@ from pathlib import Path
 from unittest.mock import patch
 from zipfile import ZIP_DEFLATED, ZipFile
 
-
 BUILD_PATH = Path(__file__).parents[1] / "packaging" / "build.py"
 SPEC = importlib.util.spec_from_file_location("openminion_packaging_build", BUILD_PATH)
 build = importlib.util.module_from_spec(SPEC)
@@ -30,6 +29,51 @@ Requires-Dist: scrapling>=0.2.0; extra == \"fetch-scrapling\"
 
 
 class BuildContractTests(unittest.TestCase):
+    def test_private_manifest_accepts_uncertified_prototype_but_never_promotes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            artifact = Path(directory) / "openminion-linux-x86_64"
+            artifact.write_bytes(b"prototype executable")
+            metadata = {
+                "target": "linux-x86_64",
+                "publishing": False,
+                "wheel": {"version": build.OPENMINION_VERSION},
+                "prototype_dependency_wheel": {"filename": "bridge.whl"},
+                "artifact": {
+                    "filename": artifact.name,
+                    "sha256": build.sha256(artifact),
+                    "size_bytes": artifact.stat().st_size,
+                },
+            }
+            artifact.with_name(artifact.name + ".json").write_text(json.dumps(metadata))
+            build.write_checksum(
+                artifact, artifact.with_name(artifact.name + ".sha256")
+            )
+            arguments = {
+                "release_id": "private.1",
+                "source_commit": build.OPENMINION_COMMIT,
+                "artifact_url": "https://staging.example.invalid/" + artifact.name,
+                "desktop_min": "0.0.0",
+                "desktop_max": "1.0.0",
+                "min_os_version": "22.04",
+                "min_libc_version": "2.35",
+            }
+            record = build.candidate_manifest(artifact, **arguments)
+            self.assertEqual(record["promotion_status"], "candidate")
+            self.assertEqual(record["artifacts"][0]["platform"], "linux")
+            self.assertEqual(record["artifacts"][0]["sha256"], build.sha256(artifact))
+            self.assertNotIn("verification_id", record["artifacts"][0])
+            with self.assertRaises(ValueError):
+                build.candidate_manifest(
+                    artifact, **{**arguments, "release_id": "../stable"}
+                )
+            with self.assertRaises(ValueError):
+                build.candidate_manifest(
+                    artifact, **{**arguments, "min_libc_version": None}
+                )
+            artifact.write_bytes(b"changed")
+            with self.assertRaises(ValueError):
+                build.candidate_manifest(artifact, **arguments)
+
     def test_repository_documentation_surface_is_complete(self) -> None:
         root = Path(__file__).parents[1]
         root_docs = {
@@ -194,9 +238,9 @@ class BuildContractTests(unittest.TestCase):
         with (
             patch.object(build.platform, "system", return_value="Darwin"),
             patch.object(build.platform, "machine", return_value="arm64"),
+            self.assertRaisesRegex(RuntimeError, "native host"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "native host"):
-                build.require_native_host("windows-x86_64")
+            build.require_native_host("windows-x86_64")
 
 
 if __name__ == "__main__":

@@ -7,16 +7,18 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import tarfile
 import tempfile
 import urllib.request
+from datetime import UTC, datetime
 from email.message import Message
 from email.parser import Parser
 from pathlib import Path
+from urllib.parse import urlparse
 from zipfile import ZipFile
-
 
 ROOT = Path(__file__).resolve().parents[1]
 INPUTS_PATH = ROOT / "packaging" / "python-distributions.json"
@@ -71,11 +73,89 @@ def verify_artifact(artifact: Path) -> None:
     print(f"verified {artifact}")
 
 
+def candidate_manifest(
+    artifact: Path,
+    *,
+    release_id: str,
+    source_commit: str,
+    artifact_url: str,
+    desktop_min: str,
+    desktop_max: str,
+    min_os_version: str,
+    min_libc_version: str | None = None,
+) -> dict:
+    """Describe verified prototype bytes privately, without claiming promotion."""
+    verify_artifact(artifact)
+    metadata = json.loads(artifact.with_name(f"{artifact.name}.json").read_text())
+    targets = {
+        "macos-arm64": ("darwin", "arm64"),
+        "linux-x86_64": ("linux", "x64"),
+        "windows-x86_64": ("win32", "x64"),
+    }
+    target_platform, arch = targets[metadata["target"]]
+    if metadata["wheel"]["version"] != OPENMINION_VERSION:
+        raise ValueError("candidate wheel version does not match the packaging pin")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", release_id):
+        raise ValueError("invalid candidate release identity")
+    if not re.fullmatch(r"[a-f0-9]{40}", source_commit):
+        raise ValueError("candidate requires exact source revision")
+    official_commit = metadata["wheel"].get("commit")
+    if official_commit and official_commit != source_commit:
+        raise ValueError("candidate source revision does not match the wheel")
+    url = urlparse(artifact_url)
+    if (
+        url.scheme != "https"
+        or not url.netloc
+        or url.username
+        or url.password
+        or url.query
+        or url.fragment
+        or not url.path.endswith("/" + artifact.name)
+    ):
+        raise ValueError("candidate requires a fixed HTTPS artifact location")
+    bounds = []
+    for value in (desktop_min, desktop_max):
+        if not re.fullmatch(r"\d+\.\d+\.\d+", value):
+            raise ValueError("invalid proposed Desktop bounds")
+        bounds.append(tuple(int(part) for part in value.split(".")))
+    if bounds[0] >= bounds[1] or not min_os_version:
+        raise ValueError("invalid proposed native baseline")
+    entry = {
+        **metadata["artifact"],
+        "platform": target_platform,
+        "arch": arch,
+        "url": artifact_url,
+        "format": "executable",
+        "min_os_version": min_os_version,
+    }
+    if target_platform == "linux":
+        if not min_libc_version:
+            raise ValueError("Linux candidate requires its proposed glibc baseline")
+        entry.update(libc_family="glibc", min_libc_version=min_libc_version)
+    return {
+        "schema_version": 1,
+        "product": "openminion",
+        "distribution": "binary",
+        "channel": "stable",
+        "promotion_status": "candidate",
+        "runtime_version": OPENMINION_VERSION,
+        "release_id": release_id,
+        "source_commit": source_commit,
+        "published_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "release_notes_url": f"{OPENMINION_SOURCE}/releases/tag/v{OPENMINION_VERSION}",
+        "desktop_compatibility": {
+            "min_version": desktop_min,
+            "max_version_exclusive": desktop_max,
+        },
+        "artifacts": [entry],
+    }
+
+
 def run(
     command: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None
 ) -> str:
     completed = subprocess.run(
-        command, cwd=cwd, env=env, text=True, capture_output=True
+        command, cwd=cwd, env=env, text=True, capture_output=True, check=False
     )
     if completed.stdout:
         print(completed.stdout, end="")
@@ -470,11 +550,34 @@ def parser() -> argparse.ArgumentParser:
     )
     verify = subparsers.add_parser("verify")
     verify.add_argument("--artifact", required=True, type=Path)
+    candidate = subparsers.add_parser("candidate-manifest")
+    candidate.add_argument("--artifact", required=True, type=Path)
+    candidate.add_argument("--release-id", required=True)
+    candidate.add_argument("--source-commit", required=True)
+    candidate.add_argument("--artifact-url", required=True)
+    candidate.add_argument("--desktop-min", required=True)
+    candidate.add_argument("--desktop-max", required=True)
+    candidate.add_argument("--min-os-version", required=True)
+    candidate.add_argument("--min-libc-version")
+    candidate.add_argument("--output", required=True, type=Path)
     return argument_parser
 
 
 def main() -> None:
     args = parser().parse_args()
+    if args.command == "candidate-manifest":
+        record = candidate_manifest(
+            args.artifact,
+            release_id=args.release_id,
+            source_commit=args.source_commit,
+            artifact_url=args.artifact_url,
+            desktop_min=args.desktop_min,
+            desktop_max=args.desktop_max,
+            min_os_version=args.min_os_version,
+            min_libc_version=args.min_libc_version,
+        )
+        args.output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+        return
     if args.command == "verify":
         verify_artifact(args.artifact)
         return

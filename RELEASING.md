@@ -1,10 +1,27 @@
 # OpenMinion Standalone Packaging Releases
 
 Status: prototype only
-Last updated: 2026-09-13
+Last updated: 2026-09-17
 
 This repository does not currently publish production artifacts. The manual
 `Prototype` workflow produces unsigned temporary evidence only.
+
+## Private Candidate Metadata
+
+After verifying an artifact, the existing builder can describe it for private
+native qualification:
+
+```bash
+python3.11 packaging/build.py candidate-manifest --help
+```
+
+Supply its exact source commit, release identity, fixed private HTTPS artifact
+URL, proposed Desktop bounds and native OS baseline. Linux also requires the
+proposed glibc minimum. The output always has `promotion_status: candidate`;
+proposed bounds are not a certification assertion. Artifact metadata/hash/size
+must match the actual executable. Prototype dependency bridges are allowed for
+private qualification only. No public feed, binary installer enablement or
+central publication request is produced by this command.
 
 ## Current prototype gate
 
