@@ -44,5 +44,6 @@ build output is written beneath the ignored `dist/` directory.
 ## Full target matrix
 
 The manual GitHub `Prototype` workflow runs the same builder on native macOS,
-Linux, and Windows runners. It uploads unsigned temporary artifacts for
-prototype verification and does not create a public release.
+Linux, and Windows runners. It stages unsigned temporary artifacts in a private
+draft release for prototype verification. That draft is not public and should
+be deleted after verification or transfer.

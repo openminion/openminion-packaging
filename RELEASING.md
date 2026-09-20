@@ -4,7 +4,10 @@ Status: prototype only
 Last updated: 2026-09-17
 
 This repository does not currently publish production artifacts. The manual
-`Prototype` workflow produces unsigned temporary evidence only.
+`Prototype` workflow produces unsigned temporary evidence only. It stages that
+evidence in a private draft release so native outputs can be verified or moved
+without depending on GitHub Actions artifact storage. Delete the draft after
+the outputs are handled.
 
 ## Private Candidate Metadata
 

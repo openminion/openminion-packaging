@@ -48,8 +48,9 @@ python3.11 packaging/build.py build \
 ```
 
 The manual `Prototype` workflow obtains and verifies these inputs, builds on
-all three native runners, and uploads unsigned temporary artifacts. It does not
-publish releases.
+all three native runners, and stages unsigned temporary artifacts in a private
+draft release. The draft is an internal handoff for verification or transfer;
+it is not a public release and should be deleted after its outputs are handled.
 
 The source-built Sophiagraph wheel is a nonpublishing bridge for a Windows
 filename correction. Releasable OpenMinion artifacts must use the corrected

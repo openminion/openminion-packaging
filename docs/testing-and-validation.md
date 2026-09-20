@@ -31,7 +31,7 @@ prove that an executable runs correctly on every target.
 
 Use the manual GitHub `Prototype` workflow for the three-target matrix. A
 successful run proves that the pinned inputs build on native GitHub runners and
-that each temporary artifact:
+that each artifact staged in its private draft release:
 
 - matches its generated metadata and checksum,
 - launches from a path containing spaces without a host Python on `PATH`,
@@ -47,4 +47,4 @@ The following remain separate from a green prototype workflow:
 - public release publication
 
 Record only the evidence actually run. Do not infer public availability from a
-local build or uploaded workflow artifact.
+local build or private draft release.

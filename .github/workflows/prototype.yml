@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   wheel:
@@ -35,11 +35,18 @@ jobs:
           python -m pip install build==1.5.0 setuptools==84.0.0 wheel==0.48.0
           python -m build --wheel --no-isolation --outdir wheel sophiagraph-source
           echo "152bc782b4715bd0580d2efee5890608b2a65d031a5559b9adc135f7b0d5115e  wheel/sophiagraph-0.0.10-py3-none-any.whl" | sha256sum --check
-      - uses: actions/upload-artifact@v7
-        with:
-          name: openminion-wheel
-          path: wheel/*.whl
-          retention-days: 3
+      - name: Stage exact wheels in a private draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="prototype-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" \
+            --draft \
+            --target "$GITHUB_SHA" \
+            --title "Prototype $tag" \
+            --notes "Private temporary artifacts for native prototype verification."
+          gh release upload "$tag" wheel/*.whl
 
   build:
     needs: wheel
@@ -59,10 +66,16 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - uses: actions/download-artifact@v8
-        with:
-          name: openminion-wheel
-          path: wheel
+      - name: Download exact wheels from the private draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir wheel
+          gh release download \
+            "prototype-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --pattern '*.whl' \
+            --dir wheel
       - name: Install pinned build tools
         shell: bash
         run: |
@@ -152,10 +165,11 @@ jobs:
                   raise SystemExit(f"missing runtime state: {relative}")
           print("offline runtime smoke passed twice")
           PY
-      - uses: actions/upload-artifact@v7
-        with:
-          name: openminion-${{ matrix.target }}-prototype
-          path: |
+      - name: Stage verified output in the private draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload \
+            "prototype-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             dist/openminion-0.0.20-${{ matrix.target }}*
-            !dist/work-*/**
-          retention-days: 3
