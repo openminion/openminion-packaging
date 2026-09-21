@@ -109,7 +109,19 @@ jobs:
           daemon=$(find dist -maxdepth 1 -name 'openminiond-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
           source_commit=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["wheel"]["commit"])' "$cli.json")
           base="https://github.com/openminion/openminion-packaging/releases/download/${{ needs.prepare.outputs.tag }}"
-          min_os=$(node -p '(process.getSystemVersion().match(/\d+(?:\.\d+)*/) || [""])[0]')
+          case "${{ matrix.target }}" in
+            macos-arm64)
+              min_os=$(sw_vers -productVersion)
+              ;;
+            linux-x86_64)
+              . /etc/os-release
+              min_os=$VERSION_ID
+              ;;
+            windows-x86_64)
+              min_os=$(python -c 'import platform; print(platform.version())')
+              ;;
+          esac
+          min_os=${min_os//$'\r'/}
           test -n "$min_os"
           libc=()
           if [ "${{ matrix.target }}" = "linux-x86_64" ]; then

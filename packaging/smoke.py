@@ -20,7 +20,7 @@ def available_port() -> int:
         return int(listener.getsockname()[1])
 
 
-def wait_for_health(port: int, process: subprocess.Popen[str]) -> dict:
+def wait_for_health(port: int, process: subprocess.Popen[str], log_path: Path) -> dict:
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
         if process.poll() is not None:
@@ -39,10 +39,17 @@ def wait_for_health(port: int, process: subprocess.Popen[str]) -> dict:
         except (ConnectionError, OSError, TimeoutError):
             pass
         time.sleep(0.2)
-    raise TimeoutError("foreground daemon health endpoint did not become ready")
+    daemon_log = (
+        log_path.read_text(encoding="utf-8", errors="replace")[-8000:]
+        if log_path.is_file()
+        else "daemon log was not created"
+    )
+    raise TimeoutError(
+        "foreground daemon health endpoint did not become ready\n" + daemon_log
+    )
 
 
-def stop(process: subprocess.Popen[str]) -> None:
+def stop(process: subprocess.Popen[str], *, require_graceful: bool = True) -> None:
     if process.poll() is not None:
         return
     if os.name == "nt":
@@ -52,9 +59,25 @@ def stop(process: subprocess.Popen[str]) -> None:
     try:
         process.wait(timeout=30)
     except subprocess.TimeoutExpired:
-        process.kill()
+        if os.name == "nt":
+            completed = subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if completed.returncode != 0 and process.poll() is None:
+                raise RuntimeError(
+                    "failed to terminate foreground daemon process tree\n"
+                    f"{completed.stdout}\n{completed.stderr}"
+                )
+        else:
+            process.kill()
         process.wait(timeout=10)
-        raise RuntimeError("foreground daemon did not stop after its supported signal")
+        if require_graceful:
+            raise RuntimeError(
+                "foreground daemon did not stop after its supported signal"
+            )
 
 
 def main() -> None:
@@ -122,9 +145,11 @@ def main() -> None:
             creationflags=creationflags,
         )
         try:
-            health = wait_for_health(port, process)
-        finally:
-            stop(process)
+            health = wait_for_health(port, process, root / "data/logs/openminiond.log")
+        except Exception:
+            stop(process, require_graceful=False)
+            raise
+        stop(process)
         if process.returncode != 0:
             stdout, stderr = process.communicate()
             raise RuntimeError(
