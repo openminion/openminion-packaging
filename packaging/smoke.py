@@ -64,7 +64,7 @@ def stop(process: subprocess.Popen[str], *, require_graceful: bool = True) -> No
     if process.poll() is not None:
         return
     if os.name == "nt":
-        process.send_signal(signal.CTRL_C_EVENT)
+        process.send_signal(signal.CTRL_BREAK_EVENT)
     else:
         process.send_signal(signal.SIGTERM)
     try:
