@@ -43,6 +43,23 @@ class SmokeTests(unittest.TestCase):
 
         self.assertEqual(process.signals, [21])
 
+    def test_windows_control_exit_requires_daemon_cleanup(self) -> None:
+        process = FakeProcess()
+        process.returncode = smoke.WINDOWS_CONTROL_EXIT
+        pid_file = Path("openminiond.pid")
+
+        with (
+            patch.object(smoke.os, "name", "nt"),
+            patch.object(Path, "exists", return_value=False),
+        ):
+            self.assertTrue(smoke.stopped_cleanly(process, pid_file))
+
+        with (
+            patch.object(smoke.os, "name", "nt"),
+            patch.object(Path, "exists", return_value=True),
+        ):
+            self.assertFalse(smoke.stopped_cleanly(process, pid_file))
+
 
 if __name__ == "__main__":
     unittest.main()

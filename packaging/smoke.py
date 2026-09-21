@@ -13,6 +13,8 @@ import tempfile
 import time
 from pathlib import Path
 
+WINDOWS_CONTROL_EXIT = 0xC000013A
+
 
 def available_port() -> int:
     with socket.socket() as listener:
@@ -91,6 +93,16 @@ def stop(process: subprocess.Popen[str], *, require_graceful: bool = True) -> No
             )
 
 
+def stopped_cleanly(process: subprocess.Popen[str], pid_file: Path) -> bool:
+    if process.returncode == 0:
+        return True
+    return (
+        os.name == "nt"
+        and process.returncode == WINDOWS_CONTROL_EXIT
+        and not pid_file.exists()
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cli", required=True, type=Path)
@@ -101,8 +113,12 @@ def main() -> None:
         if not executable.is_file():
             parser.error(f"missing executable: {executable}")
 
-    with tempfile.TemporaryDirectory(prefix="openminion-packaged-smoke-") as directory:
+    with tempfile.TemporaryDirectory(
+        prefix="openminion-packaged-smoke-",
+        ignore_cleanup_errors=os.name == "nt",
+    ) as directory:
         root = Path(directory)
+        pid_file = root / "openminiond.pid"
         environment = {
             **os.environ,
             "OPENMINION_HOME": str(root / "home"),
@@ -153,7 +169,7 @@ def main() -> None:
                     "--port",
                     str(port),
                     "--pid-file",
-                    str(root / "openminiond.pid"),
+                    str(pid_file),
                 ],
                 stdout=stdout_stream,
                 stderr=stderr_stream,
@@ -173,13 +189,14 @@ def main() -> None:
                 stop(process, require_graceful=False)
                 raise
             stop(process)
-        if process.returncode != 0:
+        if not stopped_cleanly(process, pid_file):
             raise RuntimeError(
                 f"foreground daemon stopped with {process.returncode}\n"
+                f"pid file present: {pid_file.exists()}\n"
                 f"stdout:\n{log_tail(stdout_path)}\n"
                 f"stderr:\n{log_tail(stderr_path)}"
             )
-        if (root / "openminiond.pid").exists():
+        if pid_file.exists():
             raise RuntimeError(
                 "foreground daemon left its PID file after graceful stop"
             )
