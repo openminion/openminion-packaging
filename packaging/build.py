@@ -24,15 +24,15 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUTS_PATH = ROOT / "packaging" / "python-distributions.json"
 LOCKS_DIR = ROOT / "packaging" / "locks"
 
-OPENMINION_VERSION = "0.0.23"
-OPENMINION_WHEEL = "openminion-0.0.23-py3-none-any.whl"
+OPENMINION_VERSION = "0.0.24"
+OPENMINION_WHEEL = "openminion-0.0.24-py3-none-any.whl"
 OPENMINION_WHEEL_SHA256 = (
-    "996067a0fcc80387ac085b54c1d36f14b5d92474f8a80fcc6efe16d7e6cc5075"
+    "89cec77a1944fb57d966b4299917639350921b0f8e2c8b609131f663b83baeb4"
 )
-OPENMINION_WHEEL_URL = "https://files.pythonhosted.org/packages/fa/c4/6ad79c9db011dc8199cb0a6c8aea3df5255aaf7eb6e0e6fedde161c4f21f/openminion-0.0.23-py3-none-any.whl"
+OPENMINION_WHEEL_URL = "https://files.pythonhosted.org/packages/65/8c/dbec2ed4dd3eeb027ed42b414c595a8f453221713edadc73446375b8a6d5/openminion-0.0.24-py3-none-any.whl"
 OPENMINION_SOURCE = "https://github.com/openminion/openminion"
-OPENMINION_TAG = "v0.0.23"
-OPENMINION_COMMIT = "974d832a039e2ca68431a1bfd77eebc3050a4851"
+OPENMINION_TAG = "v0.0.24"
+OPENMINION_COMMIT = "2ea4b02698f8af6e741b29488a0e2ce91df44814"
 
 PYAPP_VERSION = "0.29.0"
 PYAPP_SOURCE = "https://github.com/ofek/pyapp"
