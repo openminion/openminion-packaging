@@ -1,7 +1,7 @@
 # OpenMinion Packaging Compatibility Policy
 
 Owner: `openminion-packaging`
-Status: private prototype
+Status: private release-candidate contract
 Scope: build entrypoints, target identifiers, and emitted artifact metadata
 
 ## Supported operator surface
@@ -19,7 +19,8 @@ are repository-owned data.
 
 ## Stability
 
-This is a private prototype, so the command and metadata contracts may change.
+This is a private candidate pipeline, so the command and candidate metadata
+contracts may change before the first stable binary publication.
 Changes must update the README, package docs, tests, and changelog together.
 
 Only command-line behavior and emitted artifact metadata are compatibility
@@ -30,5 +31,5 @@ temporary directories, and generated files are internal implementation details.
 
 This repository does not define OpenMinion runtime APIs, configuration formats,
 plugin contracts, or Desktop behavior. Those remain owned by their source
-repositories. A successful prototype build is not a public support or release
+repositories. A successful candidate build is not a public support or release
 claim.

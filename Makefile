@@ -22,7 +22,7 @@ test:
 	$(PYTHON) -m unittest discover -s tests
 
 workflow-check:
-	actionlint .github/workflows/prototype.yml
+	actionlint .github/workflows/runtime-candidates.yml
 
 check: format-check lint test workflow-check
 

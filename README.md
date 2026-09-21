@@ -1,12 +1,13 @@
 # OpenMinion Standalone Packaging
 
-Status: private prototype
+Status: private release candidates; public binary promotion is gated
 
 This repository builds target-specific OpenMinion command-line executables from
 the official `openminion` wheel. It owns packaging and release mechanics only;
 it never imports from or edits an OpenMinion source checkout.
 
-No artifact produced here is currently a supported public download.
+No artifact produced here is a supported public download until it completes
+native trust qualification and the central runtime-manifest publication flow.
 
 ## Start here
 
@@ -15,14 +16,14 @@ No artifact produced here is currently a supported public download.
 | Prepare a local native build | [Getting started](docs/getting-started.md) |
 | Understand repository ownership | [Source tree owner map](docs/source-tree-owner-map.md) |
 | Run the validation gates | [Testing and validation](docs/testing-and-validation.md) |
-| Review prototype readiness | [Certification readiness matrix](docs/certification-readiness-matrix.md) |
+| Review release readiness | [Certification readiness matrix](docs/certification-readiness-matrix.md) |
 | Understand release restrictions | [Releasing](RELEASING.md) |
 
 The complete documentation index is in [docs/README.md](docs/README.md).
 
-## Current prototype
+## Current candidate targets
 
-The native prototype targets are:
+The native candidate targets are:
 
 - `macos-arm64`
 - `linux-x86_64`
@@ -31,35 +32,33 @@ The native prototype targets are:
 The build uses Python 3.11, `uv==0.9.21`, Rust `1.89.0`, and PyApp `0.29.0`.
 Run it only on the matching native platform.
 
-Place the exact OpenMinion and prototype dependency wheels in `wheel/`, then
-run:
+Download the pinned official wheel, then validate its target lock and build the
+paired CLI and daemon executables:
 
 ```bash
+python3.11 packaging/build.py download-wheel --output-dir wheel
+
 python3.11 packaging/build.py lock \
   --target macos-arm64 \
-  --wheel wheel/openminion-0.0.20-py3-none-any.whl \
-  --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl \
+  --wheel wheel/openminion-0.0.23-py3-none-any.whl \
+  --wheel-origin pypi \
   --check
 
 python3.11 packaging/build.py build \
   --target macos-arm64 \
-  --wheel wheel/openminion-0.0.20-py3-none-any.whl \
-  --dependency-wheel wheel/sophiagraph-0.0.10-py3-none-any.whl
+  --wheel wheel/openminion-0.0.23-py3-none-any.whl \
+  --wheel-origin pypi
 ```
 
-The manual `Prototype` workflow obtains and verifies these inputs, builds on
-all three native runners, and stages unsigned temporary artifacts in a private
-draft release. The draft is an internal handoff for verification or transfer;
-it is not a public release and should be deleted after its outputs are handled.
-
-The source-built Sophiagraph wheel is a nonpublishing bridge for a Windows
-filename correction. Releasable OpenMinion artifacts must use the corrected
-official dependency wheel after that package completes its own release process.
+The manual `Runtime candidates` workflow performs the same build and paired
+runtime smoke test on all three native runners. It stores unsigned executables,
+metadata, checksums, and one aggregate `candidate.json` in a private draft
+release. That draft is qualification evidence only, not a public release.
 
 ## Repository boundary
 
 - `packaging/` owns the single local and CI build implementation.
-- `.github/workflows/prototype.yml` invokes that same implementation.
+- `.github/workflows/runtime-candidates.yml` invokes that same implementation.
 - `tests/` protects input, lock, platform, and metadata contracts.
 - `docs/` explains package-local operation and evidence boundaries.
 - `dist/` and `wheel/` are generated and never committed.

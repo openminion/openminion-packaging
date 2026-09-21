@@ -24,15 +24,15 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUTS_PATH = ROOT / "packaging" / "python-distributions.json"
 LOCKS_DIR = ROOT / "packaging" / "locks"
 
-OPENMINION_VERSION = "0.0.20"
-OPENMINION_WHEEL = "openminion-0.0.20-py3-none-any.whl"
+OPENMINION_VERSION = "0.0.23"
+OPENMINION_WHEEL = "openminion-0.0.23-py3-none-any.whl"
 OPENMINION_WHEEL_SHA256 = (
-    "a305a2a89f7fd4c8e43c1eba3268e435c57ab5c02b5042a0d33ea87e180262e7"
+    "996067a0fcc80387ac085b54c1d36f14b5d92474f8a80fcc6efe16d7e6cc5075"
 )
-OPENMINION_WHEEL_URL = "https://files.pythonhosted.org/packages/5e/1b/9dbdd72266c972038889c7be10cf41faf81792307a2df184d1a6ee853eb8/openminion-0.0.20-py3-none-any.whl"
+OPENMINION_WHEEL_URL = "https://files.pythonhosted.org/packages/fa/c4/6ad79c9db011dc8199cb0a6c8aea3df5255aaf7eb6e0e6fedde161c4f21f/openminion-0.0.23-py3-none-any.whl"
 OPENMINION_SOURCE = "https://github.com/openminion/openminion"
-OPENMINION_TAG = "v0.0.20"
-OPENMINION_COMMIT = "5027c2a81af36785b96e7c6005c0606644725707"
+OPENMINION_TAG = "v0.0.23"
+OPENMINION_COMMIT = "974d832a039e2ca68431a1bfd77eebc3050a4851"
 
 PYAPP_VERSION = "0.29.0"
 PYAPP_SOURCE = "https://github.com/ofek/pyapp"
@@ -74,45 +74,62 @@ def verify_artifact(artifact: Path) -> None:
 
 
 def candidate_manifest(
-    artifact: Path,
+    cli_artifact: Path,
+    daemon_artifact: Path,
     *,
     release_id: str,
     source_commit: str,
-    artifact_url: str,
+    cli_url: str,
+    daemon_url: str,
     desktop_min: str,
     desktop_max: str,
     min_os_version: str,
     min_libc_version: str | None = None,
 ) -> dict:
-    """Describe verified prototype bytes privately, without claiming promotion."""
-    verify_artifact(artifact)
-    metadata = json.loads(artifact.with_name(f"{artifact.name}.json").read_text())
+    """Describe verified candidate bytes privately, without claiming promotion."""
+    artifacts = {"cli": cli_artifact, "daemon": daemon_artifact}
+    metadata = {}
+    for role, artifact in artifacts.items():
+        verify_artifact(artifact)
+        item = json.loads(artifact.with_name(f"{artifact.name}.json").read_text())
+        if item.get("role") != role:
+            raise ValueError(f"candidate {role} artifact role mismatch")
+        metadata[role] = item
+    cli_metadata = metadata["cli"]
+    if metadata["daemon"]["target"] != cli_metadata["target"]:
+        raise ValueError("candidate executables must have the same target")
+    if metadata["daemon"]["wheel"] != cli_metadata["wheel"]:
+        raise ValueError("candidate executables must embed the same wheel")
     targets = {
         "macos-arm64": ("darwin", "arm64"),
         "linux-x86_64": ("linux", "x64"),
         "windows-x86_64": ("win32", "x64"),
     }
-    target_platform, arch = targets[metadata["target"]]
-    if metadata["wheel"]["version"] != OPENMINION_VERSION:
+    target_platform, arch = targets[cli_metadata["target"]]
+    if cli_metadata["wheel"]["version"] != OPENMINION_VERSION:
         raise ValueError("candidate wheel version does not match the packaging pin")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", release_id):
         raise ValueError("invalid candidate release identity")
     if not re.fullmatch(r"[a-f0-9]{40}", source_commit):
         raise ValueError("candidate requires exact source revision")
-    official_commit = metadata["wheel"].get("commit")
+    official_commit = cli_metadata["wheel"].get("commit")
     if official_commit and official_commit != source_commit:
         raise ValueError("candidate source revision does not match the wheel")
-    url = urlparse(artifact_url)
-    if (
-        url.scheme != "https"
-        or not url.netloc
-        or url.username
-        or url.password
-        or url.query
-        or url.fragment
-        or not url.path.endswith("/" + artifact.name)
-    ):
-        raise ValueError("candidate requires a fixed HTTPS artifact location")
+    locations = {}
+    for role, artifact in artifacts.items():
+        artifact_url = cli_url if role == "cli" else daemon_url
+        url = urlparse(artifact_url)
+        if (
+            url.scheme != "https"
+            or not url.netloc
+            or url.username
+            or url.password
+            or url.query
+            or url.fragment
+            or not url.path.endswith("/" + artifact.name)
+        ):
+            raise ValueError("candidate requires fixed HTTPS artifact locations")
+        locations[role] = {**metadata[role]["artifact"], "url": artifact_url}
     bounds = []
     for value in (desktop_min, desktop_max):
         if not re.fullmatch(r"\d+\.\d+\.\d+", value):
@@ -121,12 +138,12 @@ def candidate_manifest(
     if bounds[0] >= bounds[1] or not min_os_version:
         raise ValueError("invalid proposed native baseline")
     entry = {
-        **metadata["artifact"],
         "platform": target_platform,
         "arch": arch,
-        "url": artifact_url,
-        "format": "executable",
+        "format": "executables",
         "min_os_version": min_os_version,
+        "cli": locations["cli"],
+        "daemon": locations["daemon"],
     }
     if target_platform == "linux":
         if not min_libc_version:
@@ -148,6 +165,52 @@ def candidate_manifest(
             "max_version_exclusive": desktop_max,
         },
         "artifacts": [entry],
+    }
+
+
+def merge_candidates(paths: list[Path], release_id: str) -> dict:
+    if not paths:
+        raise ValueError("at least one candidate record is required")
+    records = [json.loads(path.read_text()) for path in paths]
+    first = records[0]
+    shared_keys = (
+        "schema_version",
+        "product",
+        "distribution",
+        "channel",
+        "promotion_status",
+        "runtime_version",
+        "source_commit",
+        "release_notes_url",
+        "desktop_compatibility",
+    )
+    if any(
+        tuple(record.get(key) for key in shared_keys)
+        != tuple(first.get(key) for key in shared_keys)
+        for record in records[1:]
+    ):
+        raise ValueError("candidate records do not share one release identity")
+    if first.get("promotion_status") != "candidate":
+        raise ValueError("only private candidate records can be merged")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", release_id):
+        raise ValueError("invalid candidate release identity")
+    artifacts = []
+    targets = set()
+    for record in records:
+        if len(record.get("artifacts", [])) != 1:
+            raise ValueError("each native job must contribute exactly one target")
+        artifact = record["artifacts"][0]
+        target = (artifact.get("platform"), artifact.get("arch"))
+        if target in targets:
+            raise ValueError("duplicate candidate target")
+        targets.add(target)
+        artifacts.append(artifact)
+    artifacts.sort(key=lambda item: (item["platform"], item["arch"]))
+    return {
+        **{key: first[key] for key in shared_keys},
+        "release_id": release_id,
+        "published_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "artifacts": artifacts,
     }
 
 
@@ -216,21 +279,6 @@ def wheel_record(
     return record
 
 
-def write_download_lock(lock: Path, output: Path, dependency_wheel: Path) -> None:
-    dependency_name = (
-        read_wheel_metadata(dependency_wheel)["Name"].lower().replace("_", "-")
-    )
-    lines: list[str] = []
-    skip = False
-    for line in lock.read_text().splitlines():
-        if line and not line[0].isspace():
-            name = line.split("==", 1)[0].lower().replace("_", "-")
-            skip = name == dependency_name
-        if not skip:
-            lines.append(line)
-    output.write_text("\n".join(lines) + "\n")
-
-
 def load_target(target_name: str) -> dict[str, str]:
     inputs = json.loads(INPUTS_PATH.read_text())
     return inputs["targets"][target_name]
@@ -256,7 +304,6 @@ def write_lock(
     wheel: Path,
     requirements: list[str],
     check: bool,
-    dependency_wheel: Path | None,
 ) -> None:
     uv_version = run(["uv", "--version"]).split()[1]
     if uv_version != UV_VERSION:
@@ -285,8 +332,6 @@ def write_lock(
             "--output-file",
             str(output_path),
         ]
-        if dependency_wheel is not None:
-            command.extend(["--find-links", str(dependency_wheel.parent.resolve())])
         run(command)
         generated = output_path.read_text()
     if check:
@@ -323,17 +368,12 @@ def populate_runtime(
     target: dict[str, str],
     lock: Path,
     wheel: Path,
-    dependency_wheel: Path | None,
     work_dir: Path,
 ) -> tuple[Path, list[dict[str, str]]]:
     relative_python = Path(target["python_path"]).relative_to("runtime")
     python = runtime / relative_python
     wheelhouse = work_dir / "wheelhouse"
     wheelhouse.mkdir()
-    download_lock = lock
-    if dependency_wheel is not None:
-        download_lock = work_dir / "download-requirements.txt"
-        write_download_lock(lock, download_lock, dependency_wheel)
     download_command = [
         str(python),
         "-m",
@@ -345,11 +385,9 @@ def populate_runtime(
         "--dest",
         str(wheelhouse),
         "-r",
-        str(download_lock),
+        str(lock),
     ]
     run(download_command)
-    if dependency_wheel is not None:
-        shutil.copy2(dependency_wheel, wheelhouse / dependency_wheel.name)
     manifest = [
         {"filename": item.name, "sha256": sha256(item)}
         for item in sorted(wheelhouse.iterdir())
@@ -390,12 +428,12 @@ def checkout_pyapp(destination: Path) -> None:
 
 
 def pyapp_environment(
-    version: str, target: dict[str, str], distribution: Path
+    version: str, target: dict[str, str], distribution: Path, module: str
 ) -> dict[str, str]:
     values = {
         "PYAPP_PROJECT_NAME": "openminion",
         "PYAPP_PROJECT_VERSION": version,
-        "PYAPP_EXEC_MODULE": "openminion",
+        "PYAPP_EXEC_MODULE": module,
         "PYAPP_PYTHON_VERSION": "3.11",
         "PYAPP_DISTRIBUTION_PATH": str(distribution.resolve()),
         "PYAPP_DISTRIBUTION_PYTHON_PATH": target["python_path"],
@@ -429,7 +467,6 @@ def build(
     wheel: Path,
     origin: str,
     expected_sha256: str | None,
-    dependency_wheel: Path | None,
     output_dir: Path,
 ) -> None:
     require_native_host(target_name)
@@ -448,64 +485,26 @@ def build(
     python_archive = work_dir / Path(target["archive_url"]).name
     download(target["archive_url"], python_archive, target["archive_sha256"])
     runtime = extract_python(python_archive, work_dir)
-    python, wheelhouse = populate_runtime(
-        runtime, target, lock, wheel, dependency_wheel, work_dir
-    )
+    python, wheelhouse = populate_runtime(runtime, target, lock, wheel, work_dir)
     distribution = work_dir / f"openminion-runtime-{target_name}.tar.gz"
     archive_runtime(runtime, distribution)
 
     pyapp_source = work_dir / "pyapp"
     pyapp_source.mkdir()
     checkout_pyapp(pyapp_source)
-    environment = {
-        name: value
-        for name, value in os.environ.items()
-        if not name.startswith("PYAPP_")
-    }
-    environment.update(pyapp_environment(version, target, distribution))
-    run(["cargo", "build", "--release", "--locked"], cwd=pyapp_source, env=environment)
-
-    artifact_name = f"openminion-{version}-{target_name}"
-    if target["os"] == "windows":
-        artifact_name += ".exe"
-    artifact = output_dir / artifact_name
-    shutil.copy2(
-        pyapp_source
-        / "target"
-        / "release"
-        / target["binary_name"].replace("openminion", "pyapp"),
-        artifact,
-    )
-    artifact.chmod(artifact.stat().st_mode | 0o111)
-
     wheelhouse_manifest = work_dir / "wheelhouse.json"
     wheelhouse_manifest.write_text(json.dumps(wheelhouse, indent=2) + "\n")
-    metadata = {
+    common_metadata = {
         "schema_version": 1,
         "target": target_name,
         "profile": PROFILE,
         "publishing": False,
         "wheel": wheel_record(wheel, version, origin, wheel_sha256),
-        "prototype_dependency_wheel": (
-            None
-            if dependency_wheel is None
-            else {
-                "filename": dependency_wheel.name,
-                "sha256": sha256(dependency_wheel),
-            }
-        ),
         "python": {
             "version": json.loads(INPUTS_PATH.read_text())["python_version"],
             "archive_url": target["archive_url"],
             "archive_sha256": target["archive_sha256"],
             "embedded_archive_sha256": sha256(distribution),
-        },
-        "pyapp": {
-            "version": PYAPP_VERSION,
-            "source": PYAPP_SOURCE,
-            "commit": PYAPP_COMMIT,
-            "cargo_lock_sha256": PYAPP_CARGO_LOCK_SHA256,
-            "environment": pyapp_environment(version, target, distribution),
         },
         "tools": {
             "uv": UV_VERSION,
@@ -514,18 +513,54 @@ def build(
         },
         "lock_sha256": sha256(lock),
         "wheelhouse_manifest_sha256": sha256(wheelhouse_manifest),
-        "artifact": {
-            "filename": artifact.name,
-            "sha256": sha256(artifact),
-            "size_bytes": artifact.stat().st_size,
-        },
         "packages": installed_packages(target, runtime),
         "embedded_python": str(python.relative_to(runtime)),
     }
-    metadata_path = output_dir / f"{artifact.name}.json"
-    metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
-    write_checksum(artifact, output_dir / f"{artifact.name}.sha256")
-    print(f"built {artifact}")
+    base_environment = {
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith("PYAPP_")
+    }
+    binary_name = target["binary_name"].replace("openminion", "pyapp")
+    for role, module in (("cli", "openminion"), ("daemon", "openminion.daemon_main")):
+        target_dir = (work_dir / f"pyapp-target-{role}").resolve()
+        environment = {
+            **base_environment,
+            **pyapp_environment(version, target, distribution, module),
+            "CARGO_TARGET_DIR": str(target_dir),
+        }
+        run(
+            ["cargo", "build", "--release", "--locked"],
+            cwd=pyapp_source,
+            env=environment,
+        )
+        command = "openminion" if role == "cli" else "openminiond"
+        artifact_name = f"{command}-{version}-{target_name}"
+        if target["os"] == "windows":
+            artifact_name += ".exe"
+        artifact = output_dir / artifact_name
+        shutil.copy2(target_dir / "release" / binary_name, artifact)
+        artifact.chmod(artifact.stat().st_mode | 0o111)
+        metadata = {
+            **common_metadata,
+            "role": role,
+            "pyapp": {
+                "version": PYAPP_VERSION,
+                "source": PYAPP_SOURCE,
+                "commit": PYAPP_COMMIT,
+                "cargo_lock_sha256": PYAPP_CARGO_LOCK_SHA256,
+                "environment": pyapp_environment(version, target, distribution, module),
+            },
+            "artifact": {
+                "filename": artifact.name,
+                "sha256": sha256(artifact),
+                "size_bytes": artifact.stat().st_size,
+            },
+        }
+        metadata_path = output_dir / f"{artifact.name}.json"
+        metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
+        write_checksum(artifact, output_dir / f"{artifact.name}.sha256")
+        print(f"built {artifact}")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -543,18 +578,25 @@ def parser() -> argparse.ArgumentParser:
             "--wheel-origin", choices=("pypi", "local"), default="pypi"
         )
         subparser.add_argument("--wheel-sha256")
-        subparser.add_argument("--dependency-wheel", type=Path)
     subparsers.choices["lock"].add_argument("--check", action="store_true")
     subparsers.choices["build"].add_argument(
         "--output-dir", type=Path, default=ROOT / "dist"
     )
     verify = subparsers.add_parser("verify")
     verify.add_argument("--artifact", required=True, type=Path)
+    download_wheel = subparsers.add_parser("download-wheel")
+    download_wheel.add_argument("--output-dir", required=True, type=Path)
+    merge = subparsers.add_parser("merge-candidates")
+    merge.add_argument("--input", required=True, action="append", type=Path)
+    merge.add_argument("--release-id", required=True)
+    merge.add_argument("--output", required=True, type=Path)
     candidate = subparsers.add_parser("candidate-manifest")
-    candidate.add_argument("--artifact", required=True, type=Path)
+    candidate.add_argument("--cli-artifact", required=True, type=Path)
+    candidate.add_argument("--daemon-artifact", required=True, type=Path)
     candidate.add_argument("--release-id", required=True)
     candidate.add_argument("--source-commit", required=True)
-    candidate.add_argument("--artifact-url", required=True)
+    candidate.add_argument("--cli-url", required=True)
+    candidate.add_argument("--daemon-url", required=True)
     candidate.add_argument("--desktop-min", required=True)
     candidate.add_argument("--desktop-max", required=True)
     candidate.add_argument("--min-os-version", required=True)
@@ -565,12 +607,23 @@ def parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = parser().parse_args()
+    if args.command == "download-wheel":
+        destination = args.output_dir / OPENMINION_WHEEL
+        download(OPENMINION_WHEEL_URL, destination, OPENMINION_WHEEL_SHA256)
+        print(destination)
+        return
+    if args.command == "merge-candidates":
+        record = merge_candidates(args.input, args.release_id)
+        args.output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+        return
     if args.command == "candidate-manifest":
         record = candidate_manifest(
-            args.artifact,
+            args.cli_artifact,
+            args.daemon_artifact,
             release_id=args.release_id,
             source_commit=args.source_commit,
-            artifact_url=args.artifact_url,
+            cli_url=args.cli_url,
+            daemon_url=args.daemon_url,
             desktop_min=args.desktop_min,
             desktop_max=args.desktop_max,
             min_os_version=args.min_os_version,
@@ -590,7 +643,6 @@ def main() -> None:
             args.wheel,
             requirements,
             args.check,
-            args.dependency_wheel,
         )
         return
     if version != OPENMINION_VERSION and args.wheel_origin == "pypi":
@@ -600,7 +652,6 @@ def main() -> None:
         args.wheel,
         args.wheel_origin,
         args.wheel_sha256,
-        args.dependency_wheel,
         args.output_dir,
     )
 

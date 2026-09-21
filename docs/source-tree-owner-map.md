@@ -2,7 +2,7 @@
 
 | Path | Ownership |
 | --- | --- |
-| `.github/workflows/prototype.yml` | Manual native prototype matrix and private draft-release staging. |
+| `.github/workflows/runtime-candidates.yml` | Manual native candidate matrix, paired smoke checks, and private draft-release staging. |
 | `packaging/build.py` | Canonical local and continuous-integration build implementation. |
 | `packaging/locks/` | Hashed dependency inputs for each supported target. |
 | `packaging/python-distributions.json` | Target Python runtime identities, paths, and checksums. |

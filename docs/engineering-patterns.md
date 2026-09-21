@@ -35,6 +35,6 @@ current build contract needs it.
 
 ## Truthful lifecycle labels
 
-Prototype artifacts are unsigned and temporary. Do not describe them as
+Candidate artifacts are unsigned and temporary. Do not describe them as
 certified, released, or supported until the corresponding release gates exist
 and pass.
