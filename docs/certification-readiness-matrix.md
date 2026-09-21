@@ -7,10 +7,10 @@ Status: private native candidates; stable binary release not yet certified
 | Repository documentation and governance | Root policies and package-local guides are present and structurally tested. | Ready |
 | Local code-quality gate | Ruff, unit tests, and actionlint are grouped under `make check`. | Ready |
 | Reproducible input contract | Wheel versions, hashes, dependency locks, and target runtime hashes are explicit. | Ready |
-| Native macOS ARM64 candidate | OpenMinion 0.0.24 paired CLI/daemon build and real daemon health/shutdown smoke are implemented. | Ready for CI rerun |
-| Native Linux x86-64 candidate | OpenMinion 0.0.24 paired CLI/daemon build and real daemon health/shutdown smoke are implemented. | Ready for CI rerun |
-| Native Windows x86-64 candidate | OpenMinion 0.0.24 paired CLI/daemon build and real daemon health/shutdown smoke are implemented. | Ready for CI rerun |
-| Official dependency closure | All target locks resolve the official OpenMinion 0.0.24 wheel and official published dependencies. | Ready |
+| Native macOS ARM64 candidate | OpenMinion 0.0.25 paired CLI/daemon build and real daemon health/shutdown smoke are implemented. | Ready for CI rerun |
+| Native Linux x86-64 candidate | OpenMinion 0.0.25 paired CLI/daemon build and real daemon health/shutdown smoke are implemented. | Ready for CI rerun |
+| Native Windows x86-64 candidate | OpenMinion 0.0.25 paired CLI/daemon build and real daemon health/shutdown smoke are implemented. | Ready for CI rerun |
+| Official dependency closure | All target locks resolve the official OpenMinion 0.0.25 wheel and official published dependencies. | Ready |
 | Cross-platform candidate identity | Per-target records merge into one binary candidate without duplicate targets. | Ready |
 | Disposable Windows 11 acceptance | End-user launch and command flow have not been certified on a clean host. | Pending |
 | Windows build-time budget | Prototype timing needs a release-owner decision. | Pending |

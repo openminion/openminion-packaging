@@ -1,7 +1,7 @@
 # OpenMinion Packaging Changelog
 
 Status: active
-Last updated: 2026-09-12
+Last updated: 2026-09-21
 
 ## Unreleased
 
@@ -13,6 +13,8 @@ Last updated: 2026-09-12
 
 ### Changed
 
+- Updated native candidate inputs to the verified OpenMinion 0.0.25 PyPI wheel
+  and protected-main source revision.
 - Expanded the README into the repository landing page and corrected the local
   prototype build example to include the required dependency wheel.
 
