@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 WINDOWS_CONTROL_EXIT = 0xC000013A
+WINDOWS_DAEMON_CLEANUP_TIMEOUT_SECONDS = 30
 
 
 def available_port() -> int:
@@ -103,6 +104,13 @@ def stopped_cleanly(process: subprocess.Popen[str], pid_file: Path) -> bool:
     )
 
 
+def wait_for_daemon_cleanup(pid_file: Path, *, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while pid_file.exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    return not pid_file.exists()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cli", required=True, type=Path)
@@ -189,6 +197,11 @@ def main() -> None:
                 stop(process, require_graceful=False)
                 raise
             stop(process)
+        if os.name == "nt" and process.returncode == WINDOWS_CONTROL_EXIT:
+            wait_for_daemon_cleanup(
+                pid_file,
+                timeout=WINDOWS_DAEMON_CLEANUP_TIMEOUT_SECONDS,
+            )
         if not stopped_cleanly(process, pid_file):
             raise RuntimeError(
                 f"foreground daemon stopped with {process.returncode}\n"
