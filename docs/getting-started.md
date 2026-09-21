@@ -28,13 +28,13 @@ python3.11 packaging/build.py download-wheel --output-dir wheel
 
 python3.11 packaging/build.py lock \
   --target macos-arm64 \
-  --wheel wheel/openminion-0.0.25-py3-none-any.whl \
+  --wheel wheel/openminion-0.0.26-py3-none-any.whl \
   --wheel-origin pypi \
   --check
 
 python3.11 packaging/build.py build \
   --target macos-arm64 \
-  --wheel wheel/openminion-0.0.25-py3-none-any.whl \
+  --wheel wheel/openminion-0.0.26-py3-none-any.whl \
   --wheel-origin pypi
 ```
 

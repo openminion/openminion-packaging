@@ -13,8 +13,9 @@ Last updated: 2026-09-21
 
 ### Changed
 
-- Updated native candidate inputs to the verified OpenMinion 0.0.25 PyPI wheel
-  and protected-main source revision.
+- Updated native candidate inputs to the verified OpenMinion 0.0.26 PyPI wheel
+  and protected-main source revision, including completed packaged Windows
+  console-shutdown cleanup.
 - Expanded the README into the repository landing page and corrected the local
   prototype build example to include the required dependency wheel.
 
