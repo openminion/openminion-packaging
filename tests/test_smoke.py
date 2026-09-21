@@ -60,6 +60,30 @@ class SmokeTests(unittest.TestCase):
         ):
             self.assertFalse(smoke.stopped_cleanly(process, pid_file))
 
+    def test_waits_for_packaged_daemon_child_cleanup(self) -> None:
+        pid_file = Path("openminiond.pid")
+
+        with (
+            patch.object(Path, "exists", side_effect=[True, False, False]),
+            patch.object(smoke.time, "monotonic", side_effect=[10.0, 10.0]),
+            patch.object(smoke.time, "sleep") as sleep,
+        ):
+            self.assertTrue(smoke.wait_for_daemon_cleanup(pid_file, timeout=30))
+
+        sleep.assert_called_once_with(0.1)
+
+    def test_packaged_daemon_child_cleanup_timeout_fails(self) -> None:
+        pid_file = Path("openminiond.pid")
+
+        with (
+            patch.object(Path, "exists", side_effect=[True, True]),
+            patch.object(smoke.time, "monotonic", side_effect=[10.0, 10.0]),
+            patch.object(smoke.time, "sleep") as sleep,
+        ):
+            self.assertFalse(smoke.wait_for_daemon_cleanup(pid_file, timeout=0))
+
+        sleep.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
