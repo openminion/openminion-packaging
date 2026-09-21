@@ -55,16 +55,10 @@ jobs:
         include:
           - runner: macos-14
             target: macos-arm64
-            min_os: "14.0"
-            min_libc: ""
           - runner: windows-2022
             target: windows-x86_64
-            min_os: "11"
-            min_libc: ""
           - runner: ubuntu-22.04
             target: linux-x86_64
-            min_os: "22.04"
-            min_libc: "2.35"
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: write
@@ -115,8 +109,14 @@ jobs:
           daemon=$(find dist -maxdepth 1 -name 'openminiond-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
           source_commit=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["wheel"]["commit"])' "$cli.json")
           base="https://github.com/openminion/openminion-packaging/releases/download/${{ needs.prepare.outputs.tag }}"
+          min_os=$(node -p '(process.getSystemVersion().match(/\d+(?:\.\d+)*/) || [""])[0]')
+          test -n "$min_os"
           libc=()
-          if [ -n "${{ matrix.min_libc }}" ]; then libc=(--min-libc-version "${{ matrix.min_libc }}"); fi
+          if [ "${{ matrix.target }}" = "linux-x86_64" ]; then
+            min_libc=$(node -p 'process.report.getReport().header.glibcVersionRuntime || ""')
+            test -n "$min_libc"
+            libc=(--min-libc-version "$min_libc")
+          fi
           python packaging/build.py candidate-manifest \
             --cli-artifact "$cli" \
             --daemon-artifact "$daemon" \
@@ -126,7 +126,7 @@ jobs:
             --daemon-url "$base/$(basename "$daemon")" \
             --desktop-min "${{ inputs.desktop_min }}" \
             --desktop-max "${{ inputs.desktop_max }}" \
-            --min-os-version "${{ matrix.min_os }}" \
+            --min-os-version "$min_os" \
             "${libc[@]}" \
             --output "dist/candidate-${{ matrix.target }}.json"
       - name: Stage verified candidate evidence

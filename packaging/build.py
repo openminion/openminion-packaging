@@ -135,7 +135,8 @@ def candidate_manifest(
         if not re.fullmatch(r"\d+\.\d+\.\d+", value):
             raise ValueError("invalid proposed Desktop bounds")
         bounds.append(tuple(int(part) for part in value.split(".")))
-    if bounds[0] >= bounds[1] or not min_os_version:
+    native_version = re.compile(r"\d+(?:\.\d+)*")
+    if bounds[0] >= bounds[1] or not native_version.fullmatch(min_os_version):
         raise ValueError("invalid proposed native baseline")
     entry = {
         "platform": target_platform,
@@ -146,7 +147,7 @@ def candidate_manifest(
         "daemon": locations["daemon"],
     }
     if target_platform == "linux":
-        if not min_libc_version:
+        if not min_libc_version or not native_version.fullmatch(min_libc_version):
             raise ValueError("Linux candidate requires its proposed glibc baseline")
         entry.update(libc_family="glibc", min_libc_version=min_libc_version)
     return {

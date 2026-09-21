@@ -96,6 +96,18 @@ class BuildContractTests(unittest.TestCase):
                     artifacts["daemon"],
                     **{**arguments, "min_libc_version": None},
                 )
+            with self.assertRaises(ValueError):
+                build.candidate_manifest(
+                    artifacts["cli"],
+                    artifacts["daemon"],
+                    **{**arguments, "min_os_version": "Ubuntu 22.04"},
+                )
+            with self.assertRaises(ValueError):
+                build.candidate_manifest(
+                    artifacts["cli"],
+                    artifacts["daemon"],
+                    **{**arguments, "min_libc_version": "glibc 2.35"},
+                )
             artifacts["daemon"].write_bytes(b"changed")
             with self.assertRaises(ValueError):
                 build.candidate_manifest(
