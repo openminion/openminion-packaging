@@ -27,24 +27,25 @@ make check
 This proves formatting, lint, unit contracts, and workflow syntax. It does not
 prove that an executable runs correctly on every target.
 
-## Native prototype evidence
+## Native candidate evidence
 
-Use the manual GitHub `Prototype` workflow for the three-target matrix. A
-successful run proves that the pinned inputs build on native GitHub runners and
-that each artifact staged in its private draft release:
+Use the manual GitHub `Runtime candidates` workflow for the three-target
+matrix. A successful run proves that the pinned inputs build on native GitHub
+runners and that each paired candidate staged in its private draft release:
 
 - matches its generated metadata and checksum,
-- launches from a path containing spaces without a host Python on `PATH`,
-- starts and reopens an isolated local runtime without network access,
-- initializes the expected state and memory databases, and
-- reports no storage schema drift or traceback during those checks.
+- exposes the exact expected CLI version,
+- starts the packaged daemon as a foreground child with isolated state,
+- serves a healthy response from the real `/health` endpoint,
+- stops through the supported signal and removes its PID file, and
+- appears in one aggregate cross-platform `candidate.json` identity.
 
 The following remain separate from a green prototype workflow:
 
 - disposable Windows 11 acceptance
 - signing and notarization
 - install, upgrade, rollback, and uninstall behavior
-- public release publication
+- immutable public runtime release and protected manifest publication
 
 Record only the evidence actually run. Do not infer public availability from a
 local build or private draft release.
