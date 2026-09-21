@@ -20,13 +20,26 @@ def available_port() -> int:
         return int(listener.getsockname()[1])
 
 
-def wait_for_health(port: int, process: subprocess.Popen[str], log_path: Path) -> dict:
+def log_tail(path: Path) -> str:
+    if not path.is_file():
+        return f"{path.name} was not created"
+    return path.read_text(encoding="utf-8", errors="replace")[-8000:]
+
+
+def wait_for_health(
+    port: int,
+    process: subprocess.Popen[str],
+    daemon_log_path: Path,
+    stdout_path: Path,
+    stderr_path: Path,
+) -> dict:
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            stdout, stderr = process.communicate()
             raise RuntimeError(
-                f"foreground daemon exited early ({process.returncode})\n{stdout}\n{stderr}"
+                f"foreground daemon exited early ({process.returncode})\n"
+                f"stdout:\n{log_tail(stdout_path)}\n"
+                f"stderr:\n{log_tail(stderr_path)}"
             )
         try:
             connection = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
@@ -39,13 +52,11 @@ def wait_for_health(port: int, process: subprocess.Popen[str], log_path: Path) -
         except (ConnectionError, OSError, TimeoutError):
             pass
         time.sleep(0.2)
-    daemon_log = (
-        log_path.read_text(encoding="utf-8", errors="replace")[-8000:]
-        if log_path.is_file()
-        else "daemon log was not created"
-    )
     raise TimeoutError(
-        "foreground daemon health endpoint did not become ready\n" + daemon_log
+        "foreground daemon health endpoint did not become ready\n"
+        f"daemon log:\n{log_tail(daemon_log_path)}\n"
+        f"stdout:\n{log_tail(stdout_path)}\n"
+        f"stderr:\n{log_tail(stderr_path)}"
     )
 
 
@@ -125,35 +136,48 @@ def main() -> None:
         )
         port = available_port()
         creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-        process = subprocess.Popen(
-            [
-                str(args.daemon),
-                "serve",
-                "--config",
-                str(config),
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(port),
-                "--pid-file",
-                str(root / "openminiond.pid"),
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=environment,
-            creationflags=creationflags,
-        )
-        try:
-            health = wait_for_health(port, process, root / "data/logs/openminiond.log")
-        except Exception:
-            stop(process, require_graceful=False)
-            raise
-        stop(process)
+        stdout_path = root / "daemon.stdout.log"
+        stderr_path = root / "daemon.stderr.log"
+        with (
+            stdout_path.open("w", encoding="utf-8") as stdout_stream,
+            stderr_path.open("w", encoding="utf-8") as stderr_stream,
+        ):
+            process = subprocess.Popen(
+                [
+                    str(args.daemon),
+                    "serve",
+                    "--config",
+                    str(config),
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    str(port),
+                    "--pid-file",
+                    str(root / "openminiond.pid"),
+                ],
+                stdout=stdout_stream,
+                stderr=stderr_stream,
+                text=True,
+                env=environment,
+                creationflags=creationflags,
+            )
+            try:
+                health = wait_for_health(
+                    port,
+                    process,
+                    root / "data/logs/openminiond.log",
+                    stdout_path,
+                    stderr_path,
+                )
+            except Exception:
+                stop(process, require_graceful=False)
+                raise
+            stop(process)
         if process.returncode != 0:
-            stdout, stderr = process.communicate()
             raise RuntimeError(
-                f"foreground daemon stopped with {process.returncode}\n{stdout}\n{stderr}"
+                f"foreground daemon stopped with {process.returncode}\n"
+                f"stdout:\n{log_tail(stdout_path)}\n"
+                f"stderr:\n{log_tail(stderr_path)}"
             )
         if (root / "openminiond.pid").exists():
             raise RuntimeError(
