@@ -88,6 +88,69 @@ def verify_artifact(artifact: Path) -> None:
     print(f"verified {artifact}")
 
 
+def refresh_artifact(artifact: Path) -> None:
+    """Refresh metadata after native signing changes executable bytes."""
+    metadata_path = artifact.with_name(f"{artifact.name}.json")
+    metadata = json.loads(metadata_path.read_text())
+    if metadata.get("role") not in {"cli", "daemon"}:
+        raise ValueError("artifact metadata lacks a known executable role")
+    metadata["artifact"] = {
+        "filename": artifact.name,
+        "sha256": sha256(artifact),
+        "size_bytes": artifact.stat().st_size,
+    }
+    metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
+    write_checksum(artifact, artifact.with_name(f"{artifact.name}.sha256"))
+    verify_artifact(artifact)
+
+
+def native_verification(target: str, verification_id: str) -> dict:
+    targets = {
+        "macos-arm64": "darwin-arm64",
+        "linux-x86_64": "linux-x64",
+        "windows-x86_64": "win32-x64",
+    }
+    if target not in targets or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", verification_id
+    ):
+        raise ValueError("invalid native verification identity")
+    return {
+        "schema_version": 1,
+        "targets": {
+            targets[target]: {
+                "verification_id": verification_id,
+                "result": "passed",
+            }
+        },
+    }
+
+
+def merge_verifications(paths: list[Path]) -> dict:
+    targets = {}
+    for path in paths:
+        record = json.loads(path.read_text())
+        checks = record.get("targets")
+        if record.get("schema_version") != 1 or not isinstance(checks, dict):
+            raise ValueError("invalid native verification record")
+        for target, evidence in checks.items():
+            if target in targets:
+                raise ValueError("duplicate native verification target")
+            if (
+                target not in {"darwin-arm64", "linux-x64", "win32-x64"}
+                or not isinstance(evidence, dict)
+                or evidence.get("result") != "passed"
+                or not re.fullmatch(
+                    r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}",
+                    str(evidence.get("verification_id", "")),
+                )
+            ):
+                raise ValueError("invalid native verification record")
+            targets[target] = evidence
+    if set(targets) != {"darwin-arm64", "linux-x64", "win32-x64"}:
+        raise ValueError("native verification target set is incomplete")
+    return {"schema_version": 1, "targets": dict(sorted(targets.items()))}
+
+
 def candidate_manifest(
     cli_artifact: Path,
     daemon_artifact: Path,
@@ -600,6 +663,8 @@ def parser() -> argparse.ArgumentParser:
     )
     verify = subparsers.add_parser("verify")
     verify.add_argument("--artifact", required=True, type=Path)
+    refresh = subparsers.add_parser("refresh-artifact")
+    refresh.add_argument("--artifact", required=True, type=Path)
     verify_release = subparsers.add_parser("verify-release")
     verify_release.add_argument("--version", required=True)
     verify_release.add_argument("--source-commit", required=True)
@@ -609,6 +674,13 @@ def parser() -> argparse.ArgumentParser:
     merge.add_argument("--input", required=True, action="append", type=Path)
     merge.add_argument("--release-id", required=True)
     merge.add_argument("--output", required=True, type=Path)
+    native = subparsers.add_parser("native-verification")
+    native.add_argument("--target", required=True)
+    native.add_argument("--verification-id", required=True)
+    native.add_argument("--output", required=True, type=Path)
+    merge_native = subparsers.add_parser("merge-verifications")
+    merge_native.add_argument("--input", required=True, action="append", type=Path)
+    merge_native.add_argument("--output", required=True, type=Path)
     candidate = subparsers.add_parser("candidate-manifest")
     candidate.add_argument("--cli-artifact", required=True, type=Path)
     candidate.add_argument("--daemon-artifact", required=True, type=Path)
@@ -639,6 +711,14 @@ def main() -> None:
         record = merge_candidates(args.input, args.release_id)
         args.output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
         return
+    if args.command == "native-verification":
+        record = native_verification(args.target, args.verification_id)
+        args.output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+        return
+    if args.command == "merge-verifications":
+        record = merge_verifications(args.input)
+        args.output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+        return
     if args.command == "candidate-manifest":
         record = candidate_manifest(
             args.cli_artifact,
@@ -656,6 +736,9 @@ def main() -> None:
         return
     if args.command == "verify":
         verify_artifact(args.artifact)
+        return
+    if args.command == "refresh-artifact":
+        refresh_artifact(args.artifact)
         return
     version, requirements, _ = verify_wheel(
         args.wheel, args.wheel_origin, args.wheel_sha256

@@ -62,3 +62,31 @@ Stable binary promotion remains disabled until all of these are complete:
 Never publish an unsigned artifact or a binary produced from a dirty or
 unreviewed commit. A successful candidate workflow is necessary evidence, not
 release authorization.
+
+## Signed promotion sequence
+
+1. Configure the `runtime-signing` secret environment with the Apple
+   certificate, identity, notarization credentials, Windows signing certificate
+   and trusted timestamp URL named in `runtime-candidates.yml`.
+2. Require the candidate matrix and fresh-runner verification matrix to pass.
+   `candidate.json` describes the final signed bytes and `verification.json`
+   carries one passing native identity for every supported target.
+3. Configure the `runtime-publication` secret environment with the
+   runtime-publisher GitHub App ID/private key. The App needs contents write only on
+   `openminion/runtime`. Enable immutable Releases there before the first use.
+4. Approve **Runtime promotion** with the exact candidate tag and a new release
+   ID. It publishes the immutable runtime Release but deliberately leaves the
+   OpenMinion stable feed unchanged.
+5. Continue in Desktop's **Runtime qualification** workflow. Only after its
+   evidence PR reaches Desktop main may the separate protected OpenMinion
+   metadata workflow advertise these bytes.
+
+Both packaging workflows fail closed unless dispatched from `main`. The
+packaging repository is private on GitHub Free, where required-reviewer
+environment rules are unavailable; manual dispatch plus the hard main-ref guard
+is the enforceable packaging approval boundary. The public OpenMinion metadata
+environment retains its required reviewer.
+
+Do not add the central manifest dispatch back to this repository. Keeping asset
+publication and discoverability separate prevents an unqualified packaged
+Desktop/runtime pair from reaching clients.

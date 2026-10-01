@@ -1,0 +1,83 @@
+name: Runtime promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: Exact private candidate tag that passed signing and native verification
+        required: true
+        type: string
+      release_id:
+        description: Opaque immutable public runtime release identity
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    environment: runtime-publication
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      - name: Download the exact private candidate bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir candidate
+          gh release download "${{ inputs.candidate_tag }}" --dir candidate
+      - name: Validate exact bytes and prepare the immutable Release plan
+        run: >-
+          python packaging/publish.py
+          --candidate candidate/candidate.json
+          --verification candidate/verification.json
+          --artifact-dir candidate
+          --release-id "${{ inputs.release_id }}"
+          --output publication-plan.json
+      - name: Create a token scoped to runtime assets
+        id: publisher-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RUNTIME_PUBLISHER_APP_ID }}
+          private-key: ${{ secrets.RUNTIME_PUBLISHER_APP_PRIVATE_KEY }}
+          owner: openminion
+          repositories: runtime
+          permission-contents: write
+      - name: Publish the exact immutable public runtime Release
+        env:
+          GH_TOKEN: ${{ steps.publisher-token.outputs.token }}
+        run: |
+          test "$(gh api repos/openminion/runtime/immutable-releases --jq .enabled)" = true
+          tag=$(python -c 'import json; print(json.load(open("publication-plan.json"))["tag"])')
+          title=$(python -c 'import json; print(json.load(open("publication-plan.json"))["title"])')
+          mapfile -t assets < <(python -c 'import json; print("\n".join(json.load(open("publication-plan.json"))["assets"]))')
+          gh release create "$tag" \
+            --repo openminion/runtime \
+            --draft \
+            --target main \
+            --title "$title" \
+            --notes "Signed, native-verified OpenMinion runtime executables."
+          gh release upload "$tag" \
+            --repo openminion/runtime \
+            "${assets[@]}" \
+            candidate/candidate.json \
+            candidate/verification.json
+          gh release edit "$tag" --repo openminion/runtime --draft=false --prerelease=false
+          test "$(gh api "repos/openminion/runtime/releases/tags/$tag" --jq .immutable)" = true
+          {
+            echo '## Immutable runtime Release published'
+            echo
+            echo "- Immutable runtime Release: \`$tag\`"
+            echo '- Binary metadata publication: not requested'
+            echo '- Next gate: qualify these exact Release bytes with packaged Desktop builds on every supported target and commit the evidence to Desktop main.'
+            echo '- After qualification, dispatch the protected OpenMinion runtime-manifests workflow with the exact Release and Desktop evidence identities.'
+            echo '- Stable discovery remains pending until the metadata PR passes, is merged with a merge commit, and verify-main succeeds.'
+          } >> "$GITHUB_STEP_SUMMARY"
