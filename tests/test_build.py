@@ -283,6 +283,39 @@ class BuildContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "checksum"):
                 build.verify_artifact(artifact)
 
+    def test_refresh_artifact_records_signed_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact = Path(temp_dir) / "openminion"
+            artifact.write_bytes(b"unsigned")
+            artifact.with_name("openminion.json").write_text(
+                json.dumps({"role": "cli", "artifact": {}})
+            )
+            artifact.write_bytes(b"signed")
+            build.refresh_artifact(artifact)
+            metadata = json.loads(artifact.with_name("openminion.json").read_text())
+            self.assertEqual(metadata["artifact"]["sha256"], build.sha256(artifact))
+            build.verify_artifact(artifact)
+
+    def test_native_verification_requires_every_target_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            paths = []
+            for target in ("macos-arm64", "linux-x86_64", "windows-x86_64"):
+                path = root / f"{target}.json"
+                path.write_text(
+                    json.dumps(build.native_verification(target, f"native.{target}.1"))
+                )
+                paths.append(path)
+            merged = build.merge_verifications(paths)
+            self.assertEqual(
+                set(merged["targets"]),
+                {"darwin-arm64", "linux-x64", "win32-x64"},
+            )
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                build.merge_verifications([paths[0], paths[0]])
+            with self.assertRaisesRegex(ValueError, "incomplete"):
+                build.merge_verifications(paths[:2])
+
     def test_lock_files_use_canonical_line_endings(self) -> None:
         attributes = BUILD_PATH.parents[1] / ".gitattributes"
         self.assertIn(
