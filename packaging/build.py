@@ -24,15 +24,15 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUTS_PATH = ROOT / "packaging" / "python-distributions.json"
 LOCKS_DIR = ROOT / "packaging" / "locks"
 
-OPENMINION_VERSION = "0.0.26"
-OPENMINION_WHEEL = "openminion-0.0.26-py3-none-any.whl"
+OPENMINION_VERSION = "0.0.28"
+OPENMINION_WHEEL = "openminion-0.0.28-py3-none-any.whl"
 OPENMINION_WHEEL_SHA256 = (
-    "bf590eb010b1e4c423f1863d0dc2b6053141ac6296b290739e820cde29a1d843"
+    "5ab92bf9d40535aa460383ef57b4aeabb9b17fb11edfde251cd9d919a4819ae2"
 )
-OPENMINION_WHEEL_URL = "https://files.pythonhosted.org/packages/97/2f/85c804ba41642961310503c22ae860e847c7edff0a6148ca8e88ac7bcff4/openminion-0.0.26-py3-none-any.whl"
+OPENMINION_WHEEL_URL = "https://files.pythonhosted.org/packages/b8/e6/0c7b3c2ca7198d7e4fa0be6450934b61dcd37c4c643e0ff32c4e9b0ddc0e/openminion-0.0.28-py3-none-any.whl"
 OPENMINION_SOURCE = "https://github.com/openminion/openminion"
-OPENMINION_TAG = "v0.0.26"
-OPENMINION_COMMIT = "87c912239651e987942aa9a19b98d78e68976aac"
+OPENMINION_TAG = "v0.0.28"
+OPENMINION_COMMIT = "01ef455f337422eefe81a3084c4352d85924e78d"
 
 PYAPP_VERSION = "0.29.0"
 PYAPP_SOURCE = "https://github.com/ofek/pyapp"
@@ -51,6 +51,21 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def verify_release_request(runtime_version: str, source_commit: str) -> None:
+    """Require a candidate request to match the reviewed packaging pin exactly."""
+    if not re.fullmatch(r"\d+\.\d+\.\d+", runtime_version):
+        raise ValueError("runtime version must be a stable three-part version")
+    if not re.fullmatch(r"[a-f0-9]{40}", source_commit):
+        raise ValueError("source commit must be a full lowercase Git SHA")
+    if runtime_version != OPENMINION_VERSION:
+        raise ValueError(
+            f"candidate request {runtime_version} does not match packaging pin "
+            f"{OPENMINION_VERSION}"
+        )
+    if source_commit != OPENMINION_COMMIT:
+        raise ValueError("candidate source commit does not match the packaging pin")
 
 
 def write_checksum(artifact: Path, destination: Path) -> None:
@@ -585,6 +600,9 @@ def parser() -> argparse.ArgumentParser:
     )
     verify = subparsers.add_parser("verify")
     verify.add_argument("--artifact", required=True, type=Path)
+    verify_release = subparsers.add_parser("verify-release")
+    verify_release.add_argument("--version", required=True)
+    verify_release.add_argument("--source-commit", required=True)
     download_wheel = subparsers.add_parser("download-wheel")
     download_wheel.add_argument("--output-dir", required=True, type=Path)
     merge = subparsers.add_parser("merge-candidates")
@@ -608,6 +626,10 @@ def parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = parser().parse_args()
+    if args.command == "verify-release":
+        verify_release_request(args.version, args.source_commit)
+        print(f"verified OpenMinion {args.version} at {args.source_commit}")
+        return
     if args.command == "download-wheel":
         destination = args.output_dir / OPENMINION_WHEEL
         download(OPENMINION_WHEEL_URL, destination, OPENMINION_WHEEL_SHA256)
