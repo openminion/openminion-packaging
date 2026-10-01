@@ -1,13 +1,19 @@
 # OpenMinion Standalone Packaging Releases
 
 Status: candidate production enabled; stable promotion remains gated
-Last updated: 2026-09-20
+Last updated: 2026-10-01
 
-This repository produces private native release candidates. The manual
+This repository produces private native release candidates. The
 `Runtime candidates` workflow builds paired `openminion` and `openminiond`
 executables from the exact official OpenMinion wheel, verifies their bytes,
 starts the real daemon, probes `/health`, and records one cross-platform
 candidate identity in a private draft release.
+
+Every request supplies the final three-part runtime version and full source
+commit. The workflow rejects the request unless both values match the reviewed
+wheel, tag, and source pins in `packaging/build.py`. A successful final source
+release can request this private candidate automatically; that request grants
+no stable-publication authority.
 
 ## Private Candidate Metadata
 
@@ -29,8 +35,9 @@ native records without changing that status.
 Before reviewing a packaging change:
 
 1. run `make check`,
-2. verify the exact official OpenMinion wheel and all target locks,
-3. run the manual workflow from the commit being reviewed,
+2. verify the exact official OpenMinion wheel, source commit, and all target locks,
+3. run the workflow from the commit being reviewed with the exact final version
+   and source commit,
 4. require successful paired native builds and a real foreground-daemon health
    and graceful-shutdown smoke check for every target,
 5. verify generated artifact metadata and checksums before upload,

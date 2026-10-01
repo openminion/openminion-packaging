@@ -3,6 +3,14 @@ name: Runtime candidates
 on:
   workflow_dispatch:
     inputs:
+      runtime_version:
+        description: Exact final OpenMinion version requested by the source release
+        required: true
+        type: string
+      source_commit:
+        description: Exact full source commit behind the final OpenMinion tag
+        required: true
+        type: string
       desktop_min:
         description: Proposed inclusive Desktop compatibility bound
         required: true
@@ -31,6 +39,11 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
+      - name: Verify the release request matches the reviewed packaging pin
+        run: >-
+          python packaging/build.py verify-release
+          --version "${{ inputs.runtime_version }}"
+          --source-commit "${{ inputs.source_commit }}"
       - name: Download the exact official OpenMinion wheel
         run: python packaging/build.py download-wheel --output-dir wheel
       - name: Create private candidate release
@@ -38,7 +51,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="runtime-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tag="runtime-candidate-v${{ inputs.runtime_version }}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           gh release create "$tag" \
             --draft \
             --target "$GITHUB_SHA" \
@@ -107,7 +120,6 @@ jobs:
         run: |
           cli=$(find dist -maxdepth 1 -name 'openminion-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
           daemon=$(find dist -maxdepth 1 -name 'openminiond-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
-          source_commit=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["wheel"]["commit"])' "$cli.json")
           base="https://github.com/openminion/openminion-packaging/releases/download/${{ needs.prepare.outputs.tag }}"
           case "${{ matrix.target }}" in
             macos-arm64)
@@ -133,7 +145,7 @@ jobs:
             --cli-artifact "$cli" \
             --daemon-artifact "$daemon" \
             --release-id "candidate.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \
-            --source-commit "$source_commit" \
+            --source-commit "${{ inputs.source_commit }}" \
             --cli-url "$base/$(basename "$cli")" \
             --daemon-url "$base/$(basename "$daemon")" \
             --desktop-min "${{ inputs.desktop_min }}" \
@@ -184,3 +196,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ needs.prepare.outputs.tag }}" candidate.json
+      - name: Record the candidate disposition
+        shell: bash
+        env:
+          RUNTIME_VERSION: ${{ inputs.runtime_version }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          CANDIDATE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          {
+            echo '## Private runtime candidate'
+            echo
+            echo "- Version: \`$RUNTIME_VERSION\`"
+            echo "- Source commit: \`$SOURCE_COMMIT\`"
+            echo "- Candidate tag: \`$CANDIDATE_TAG\`"
+            echo '- State: candidate built; stable publication blocked pending signing, notarization, native verification, and Desktop qualification'
+          } >> "$GITHUB_STEP_SUMMARY"

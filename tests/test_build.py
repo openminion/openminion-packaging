@@ -29,6 +29,20 @@ Requires-Dist: scrapling>=0.2.0; extra == \"fetch-scrapling\"
 
 
 class BuildContractTests(unittest.TestCase):
+    def test_release_request_must_match_reviewed_pin(self) -> None:
+        build.verify_release_request(
+            build.OPENMINION_VERSION,
+            build.OPENMINION_COMMIT,
+        )
+        with self.assertRaisesRegex(ValueError, "stable three-part"):
+            build.verify_release_request("0.0.28rc1", build.OPENMINION_COMMIT)
+        with self.assertRaisesRegex(ValueError, "packaging pin"):
+            build.verify_release_request("0.0.29", build.OPENMINION_COMMIT)
+        with self.assertRaisesRegex(ValueError, "full lowercase"):
+            build.verify_release_request(build.OPENMINION_VERSION, "main")
+        with self.assertRaisesRegex(ValueError, "source commit"):
+            build.verify_release_request(build.OPENMINION_VERSION, "a" * 40)
+
     def test_private_manifest_accepts_uncertified_prototype_but_never_promotes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

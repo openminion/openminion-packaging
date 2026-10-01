@@ -40,20 +40,23 @@ python3.11 packaging/build.py download-wheel --output-dir wheel
 
 python3.11 packaging/build.py lock \
   --target macos-arm64 \
-  --wheel wheel/openminion-0.0.26-py3-none-any.whl \
+  --wheel wheel/openminion-0.0.28-py3-none-any.whl \
   --wheel-origin pypi \
   --check
 
 python3.11 packaging/build.py build \
   --target macos-arm64 \
-  --wheel wheel/openminion-0.0.26-py3-none-any.whl \
+  --wheel wheel/openminion-0.0.28-py3-none-any.whl \
   --wheel-origin pypi
 ```
 
-The manual `Runtime candidates` workflow performs the same build and paired
-runtime smoke test on all three native runners. It stores unsigned executables,
-metadata, checksums, and one aggregate `candidate.json` in a private draft
-release. That draft is qualification evidence only, not a public release.
+The `Runtime candidates` workflow accepts the exact final runtime version and
+source commit from the OpenMinion release. It refuses requests that do not match
+this repository's reviewed wheel and source pins, then performs the same build
+and paired runtime smoke test on all three native runners. It stores unsigned
+executables, metadata, checksums, and one aggregate `candidate.json` in a
+private draft release. That draft is qualification evidence only, not a public
+release.
 
 ## Repository boundary
 
