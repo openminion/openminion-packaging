@@ -18,6 +18,12 @@ Inspect the command surface after changing arguments or operator guidance:
 python3.11 packaging/build.py --help
 ```
 
+Before a native candidate dispatch, run `lock --check` for macOS ARM64, Linux
+x86-64, and Windows x86-64 against the exact production wheel. A mismatch means
+the reviewed dependency closure is stale; refresh the locks in a packaging PR,
+run the complete local gate, merge it, and only then rerun the candidate matrix.
+The workflow must not resolve and accept new dependency versions on its own.
+
 ## Complete local gate
 
 ```bash

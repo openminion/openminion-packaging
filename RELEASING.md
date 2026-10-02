@@ -33,6 +33,30 @@ native records without changing that status.
 
 ## Candidate gate
 
+Before publishing the final source release, generate every target lock from the
+final-version TestPyPI wheel, review the dependency diff, and land the locks on
+packaging `main`. The production wheel must have the same core requirements as
+that accepted wheel. After PyPI publication, verify all three locks again with
+the exact production wheel before dispatching `Runtime candidates`. This keeps
+dependency resolution reviewable without silently resolving new versions in a
+release job.
+
+For each target, run:
+
+```bash
+python3.11 packaging/build.py lock \
+  --target <target> \
+  --wheel <verified-wheel> \
+  --wheel-version <version> \
+  --wheel-url <official-wheel-url> \
+  --wheel-sha256 <wheel-sha256> \
+  --source-commit <source-commit>
+```
+
+Repeat with `--check` after review and for the production wheel. A lock mismatch
+blocks native candidate publication and requires a packaging PR; do not remove
+the check or regenerate locks inside the candidate workflow.
+
 Before reviewing a packaging change:
 
 1. run `make check`,

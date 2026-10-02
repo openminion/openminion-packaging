@@ -5,6 +5,10 @@ Last updated: 2026-09-21
 
 ## Unreleased
 
+- Refreshed all native dependency locks for OpenMinion 0.0.29 after the
+  reviewed SQLAlchemy 2.1.2 resolution and documented the required preflight
+  lock gate for future source releases.
+
 ### Added
 
 - Added the shared OpenMinion-family contributor, security, support, release,
