@@ -24,15 +24,8 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUTS_PATH = ROOT / "packaging" / "python-distributions.json"
 LOCKS_DIR = ROOT / "packaging" / "locks"
 
-OPENMINION_VERSION = "0.0.28"
-OPENMINION_WHEEL = "openminion-0.0.28-py3-none-any.whl"
-OPENMINION_WHEEL_SHA256 = (
-    "5ab92bf9d40535aa460383ef57b4aeabb9b17fb11edfde251cd9d919a4819ae2"
-)
-OPENMINION_WHEEL_URL = "https://files.pythonhosted.org/packages/b8/e6/0c7b3c2ca7198d7e4fa0be6450934b61dcd37c4c643e0ff32c4e9b0ddc0e/openminion-0.0.28-py3-none-any.whl"
 OPENMINION_SOURCE = "https://github.com/openminion/openminion"
-OPENMINION_TAG = "v0.0.28"
-OPENMINION_COMMIT = "01ef455f337422eefe81a3084c4352d85924e78d"
+PYPI_PROJECT_URL = "https://pypi.org/pypi/openminion"
 
 PYAPP_VERSION = "0.29.0"
 PYAPP_SOURCE = "https://github.com/ofek/pyapp"
@@ -53,19 +46,68 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def verify_release_request(runtime_version: str, source_commit: str) -> None:
-    """Require a candidate request to match the reviewed packaging pin exactly."""
+def release_request(
+    runtime_version: str,
+    source_commit: str,
+    wheel_url: str,
+    wheel_sha256: str,
+) -> dict[str, str]:
+    """Validate one exact stable release request without trusting mutable aliases."""
     if not re.fullmatch(r"\d+\.\d+\.\d+", runtime_version):
         raise ValueError("runtime version must be a stable three-part version")
     if not re.fullmatch(r"[a-f0-9]{40}", source_commit):
         raise ValueError("source commit must be a full lowercase Git SHA")
-    if runtime_version != OPENMINION_VERSION:
-        raise ValueError(
-            f"candidate request {runtime_version} does not match packaging pin "
-            f"{OPENMINION_VERSION}"
-        )
-    if source_commit != OPENMINION_COMMIT:
-        raise ValueError("candidate source commit does not match the packaging pin")
+    if not re.fullmatch(r"[a-f0-9]{64}", wheel_sha256):
+        raise ValueError("wheel SHA-256 must be a full lowercase digest")
+    filename = f"openminion-{runtime_version}-py3-none-any.whl"
+    parsed = urlparse(wheel_url)
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc != "files.pythonhosted.org"
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or not parsed.path.endswith("/" + filename)
+    ):
+        raise ValueError("wheel URL must name the exact official PyPI wheel")
+    return {
+        "version": runtime_version,
+        "source_commit": source_commit,
+        "wheel_filename": filename,
+        "wheel_url": wheel_url,
+        "wheel_sha256": wheel_sha256,
+    }
+
+
+def verify_release_request(
+    runtime_version: str,
+    source_commit: str,
+    wheel_url: str,
+    wheel_sha256: str,
+) -> dict[str, str]:
+    """Confirm the authenticated request still matches production PyPI metadata."""
+    request = release_request(runtime_version, source_commit, wheel_url, wheel_sha256)
+    with urllib.request.urlopen(
+        f"{PYPI_PROJECT_URL}/{runtime_version}/json", timeout=15
+    ) as response:
+        metadata = json.load(response)
+    wheels = [
+        item
+        for item in metadata.get("urls", [])
+        if item.get("filename") == request["wheel_filename"]
+    ]
+    if (
+        metadata.get("info", {}).get("name") != "openminion"
+        or metadata.get("info", {}).get("version") != runtime_version
+        or len(wheels) != 1
+        or wheels[0].get("url") != wheel_url
+        or wheels[0].get("digests", {}).get("sha256") != wheel_sha256
+        or wheels[0].get("packagetype") != "bdist_wheel"
+        or wheels[0].get("yanked", False)
+    ):
+        raise ValueError("candidate request differs from production PyPI metadata")
+    return request
 
 
 def write_checksum(artifact: Path, destination: Path) -> None:
@@ -184,14 +226,15 @@ def candidate_manifest(
         "windows-x86_64": ("win32", "x64"),
     }
     target_platform, arch = targets[cli_metadata["target"]]
-    if cli_metadata["wheel"]["version"] != OPENMINION_VERSION:
-        raise ValueError("candidate wheel version does not match the packaging pin")
+    runtime_version = cli_metadata["wheel"].get("version", "")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", runtime_version):
+        raise ValueError("candidate wheel version is not a stable release")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", release_id):
         raise ValueError("invalid candidate release identity")
     if not re.fullmatch(r"[a-f0-9]{40}", source_commit):
         raise ValueError("candidate requires exact source revision")
     official_commit = cli_metadata["wheel"].get("commit")
-    if official_commit and official_commit != source_commit:
+    if official_commit != source_commit:
         raise ValueError("candidate source revision does not match the wheel")
     locations = {}
     for role, artifact in artifacts.items():
@@ -234,11 +277,11 @@ def candidate_manifest(
         "distribution": "binary",
         "channel": "stable",
         "promotion_status": "candidate",
-        "runtime_version": OPENMINION_VERSION,
+        "runtime_version": runtime_version,
         "release_id": release_id,
         "source_commit": source_commit,
         "published_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        "release_notes_url": f"{OPENMINION_SOURCE}/releases/tag/v{OPENMINION_VERSION}",
+        "release_notes_url": f"{OPENMINION_SOURCE}/releases/tag/v{runtime_version}",
         "desktop_compatibility": {
             "min_version": desktop_min,
             "max_version_exclusive": desktop_max,
@@ -324,14 +367,22 @@ def wheel_metadata(wheel: Path) -> tuple[str, list[str]]:
 
 
 def verify_wheel(
-    wheel: Path, origin: str, expected_sha256: str | None
+    wheel: Path,
+    origin: str,
+    expected_sha256: str | None,
+    expected_version: str | None = None,
 ) -> tuple[str, list[str], str]:
     actual_sha256 = sha256(wheel)
     version, requirements = wheel_metadata(wheel)
     if origin == "pypi":
-        if wheel.name != OPENMINION_WHEEL or version != OPENMINION_VERSION:
-            raise ValueError(f"expected official wheel {OPENMINION_WHEEL}")
-        if actual_sha256 != OPENMINION_WHEEL_SHA256:
+        expected_name = f"openminion-{expected_version}-py3-none-any.whl"
+        if (
+            not expected_version
+            or wheel.name != expected_name
+            or version != expected_version
+        ):
+            raise ValueError(f"expected official wheel {expected_name}")
+        if not expected_sha256 or actual_sha256 != expected_sha256:
             raise ValueError("official wheel SHA-256 mismatch")
     elif not expected_sha256:
         raise ValueError("local wheel builds require --wheel-sha256")
@@ -341,19 +392,26 @@ def verify_wheel(
 
 
 def wheel_record(
-    wheel: Path, version: str, origin: str, wheel_sha256: str
+    wheel: Path,
+    version: str,
+    origin: str,
+    wheel_sha256: str,
+    wheel_url: str | None = None,
+    source_commit: str | None = None,
 ) -> dict[str, str]:
     record = {
         "version": version,
         "filename": wheel.name,
-        "origin": OPENMINION_WHEEL_URL
-        if origin == "pypi"
-        else f"local:{wheel.resolve()}",
+        "origin": wheel_url if origin == "pypi" else f"local:{wheel.resolve()}",
         "sha256": wheel_sha256,
     }
     if origin == "pypi":
+        if not wheel_url or not source_commit:
+            raise ValueError("official wheel metadata requires URL and source commit")
         record.update(
-            source=OPENMINION_SOURCE, tag=OPENMINION_TAG, commit=OPENMINION_COMMIT
+            source=OPENMINION_SOURCE,
+            tag=f"v{version}",
+            commit=source_commit,
         )
     return record
 
@@ -546,10 +604,15 @@ def build(
     wheel: Path,
     origin: str,
     expected_sha256: str | None,
+    expected_version: str | None,
+    wheel_url: str | None,
+    source_commit: str | None,
     output_dir: Path,
 ) -> None:
     require_native_host(target_name)
-    version, _, wheel_sha256 = verify_wheel(wheel, origin, expected_sha256)
+    version, _, wheel_sha256 = verify_wheel(
+        wheel, origin, expected_sha256, expected_version
+    )
     rustc_version = run(["rustc", "--version"])
     if rustc_version.split()[1] != RUST_VERSION:
         raise RuntimeError(f"expected Rust {RUST_VERSION}, found {rustc_version}")
@@ -578,7 +641,14 @@ def build(
         "target": target_name,
         "profile": PROFILE,
         "publishing": False,
-        "wheel": wheel_record(wheel, version, origin, wheel_sha256),
+        "wheel": wheel_record(
+            wheel,
+            version,
+            origin,
+            wheel_sha256,
+            wheel_url,
+            source_commit,
+        ),
         "python": {
             "version": json.loads(INPUTS_PATH.read_text())["python_version"],
             "archive_url": target["archive_url"],
@@ -657,6 +727,9 @@ def parser() -> argparse.ArgumentParser:
             "--wheel-origin", choices=("pypi", "local"), default="pypi"
         )
         subparser.add_argument("--wheel-sha256")
+        subparser.add_argument("--wheel-version")
+        subparser.add_argument("--wheel-url")
+        subparser.add_argument("--source-commit")
     subparsers.choices["lock"].add_argument("--check", action="store_true")
     subparsers.choices["build"].add_argument(
         "--output-dir", type=Path, default=ROOT / "dist"
@@ -668,8 +741,14 @@ def parser() -> argparse.ArgumentParser:
     verify_release = subparsers.add_parser("verify-release")
     verify_release.add_argument("--version", required=True)
     verify_release.add_argument("--source-commit", required=True)
+    verify_release.add_argument("--wheel-url", required=True)
+    verify_release.add_argument("--wheel-sha256", required=True)
     download_wheel = subparsers.add_parser("download-wheel")
     download_wheel.add_argument("--output-dir", required=True, type=Path)
+    download_wheel.add_argument("--version", required=True)
+    download_wheel.add_argument("--source-commit", required=True)
+    download_wheel.add_argument("--wheel-url", required=True)
+    download_wheel.add_argument("--wheel-sha256", required=True)
     merge = subparsers.add_parser("merge-candidates")
     merge.add_argument("--input", required=True, action="append", type=Path)
     merge.add_argument("--release-id", required=True)
@@ -699,12 +778,23 @@ def parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = parser().parse_args()
     if args.command == "verify-release":
-        verify_release_request(args.version, args.source_commit)
+        verify_release_request(
+            args.version,
+            args.source_commit,
+            args.wheel_url,
+            args.wheel_sha256,
+        )
         print(f"verified OpenMinion {args.version} at {args.source_commit}")
         return
     if args.command == "download-wheel":
-        destination = args.output_dir / OPENMINION_WHEEL
-        download(OPENMINION_WHEEL_URL, destination, OPENMINION_WHEEL_SHA256)
+        request = release_request(
+            args.version,
+            args.source_commit,
+            args.wheel_url,
+            args.wheel_sha256,
+        )
+        destination = args.output_dir / request["wheel_filename"]
+        download(request["wheel_url"], destination, request["wheel_sha256"])
         print(destination)
         return
     if args.command == "merge-candidates":
@@ -741,7 +831,10 @@ def main() -> None:
         refresh_artifact(args.artifact)
         return
     version, requirements, _ = verify_wheel(
-        args.wheel, args.wheel_origin, args.wheel_sha256
+        args.wheel,
+        args.wheel_origin,
+        args.wheel_sha256,
+        args.wheel_version,
     )
     if args.command == "lock":
         write_lock(
@@ -751,13 +844,14 @@ def main() -> None:
             args.check,
         )
         return
-    if version != OPENMINION_VERSION and args.wheel_origin == "pypi":
-        raise ValueError(f"expected OpenMinion {OPENMINION_VERSION}")
     build(
         args.target,
         args.wheel,
         args.wheel_origin,
         args.wheel_sha256,
+        args.wheel_version,
+        args.wheel_url,
+        args.source_commit,
         args.output_dir,
     )
 

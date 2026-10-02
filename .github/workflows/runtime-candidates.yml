@@ -11,6 +11,14 @@ on:
         description: Exact full source commit behind the final OpenMinion tag
         required: true
         type: string
+      wheel_url:
+        description: Exact files.pythonhosted.org URL verified by the source release
+        required: true
+        type: string
+      wheel_sha256:
+        description: Exact production PyPI wheel SHA-256
+        required: true
+        type: string
       desktop_min:
         description: Proposed inclusive Desktop compatibility bound
         required: true
@@ -29,6 +37,11 @@ jobs:
   prepare:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
+    env:
+      RUNTIME_VERSION: ${{ inputs.runtime_version }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      WHEEL_URL: ${{ inputs.wheel_url }}
+      WHEEL_SHA256: ${{ inputs.wheel_sha256 }}
     permissions:
       contents: write
     outputs:
@@ -40,19 +53,30 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
-      - name: Verify the release request matches the reviewed packaging pin
-        run: >-
-          python packaging/build.py verify-release
-          --version "${{ inputs.runtime_version }}"
-          --source-commit "${{ inputs.source_commit }}"
+      - name: Verify the release request against PyPI and the immutable source tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh api "repos/openminion/openminion/commits/v${RUNTIME_VERSION}" --jq .sha)" = "$SOURCE_COMMIT"
+          python packaging/build.py verify-release \
+            --version "$RUNTIME_VERSION" \
+            --source-commit "$SOURCE_COMMIT" \
+            --wheel-url "$WHEEL_URL" \
+            --wheel-sha256 "$WHEEL_SHA256"
       - name: Download the exact official OpenMinion wheel
-        run: python packaging/build.py download-wheel --output-dir wheel
+        run: >-
+          python packaging/build.py download-wheel
+          --output-dir wheel
+          --version "$RUNTIME_VERSION"
+          --source-commit "$SOURCE_COMMIT"
+          --wheel-url "$WHEEL_URL"
+          --wheel-sha256 "$WHEEL_SHA256"
       - name: Create private candidate release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="runtime-candidate-v${{ inputs.runtime_version }}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tag="runtime-candidate-v${RUNTIME_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           gh release create "$tag" \
             --draft \
             --target "$GITHUB_SHA" \
@@ -75,6 +99,13 @@ jobs:
             target: linux-x86_64
     runs-on: ${{ matrix.runner }}
     environment: runtime-signing
+    env:
+      RUNTIME_VERSION: ${{ inputs.runtime_version }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      WHEEL_URL: ${{ inputs.wheel_url }}
+      WHEEL_SHA256: ${{ inputs.wheel_sha256 }}
+      DESKTOP_MIN: ${{ inputs.desktop_min }}
+      DESKTOP_MAX: ${{ inputs.desktop_max }}
     permissions:
       contents: write
     steps:
@@ -99,8 +130,14 @@ jobs:
         shell: bash
         run: |
           wheel=$(find wheel -maxdepth 1 -name 'openminion-*.whl' -print -quit)
-          python packaging/build.py lock --target "${{ matrix.target }}" --wheel "$wheel" --check
-          python packaging/build.py build --target "${{ matrix.target }}" --wheel "$wheel"
+          release=(
+            --wheel-version "$RUNTIME_VERSION"
+            --wheel-url "$WHEEL_URL"
+            --wheel-sha256 "$WHEEL_SHA256"
+            --source-commit "$SOURCE_COMMIT"
+          )
+          python packaging/build.py lock --target "${{ matrix.target }}" --wheel "$wheel" "${release[@]}" --check
+          python packaging/build.py build --target "${{ matrix.target }}" --wheel "$wheel" "${release[@]}"
           for artifact in dist/openminion-*-${{ matrix.target }}* dist/openminiond-*-${{ matrix.target }}*; do
             case "$artifact" in *.json|*.sha256) continue;; esac
             python packaging/build.py verify --artifact "$artifact"
@@ -220,11 +257,11 @@ jobs:
             --cli-artifact "$cli" \
             --daemon-artifact "$daemon" \
             --release-id "candidate.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \
-            --source-commit "${{ inputs.source_commit }}" \
+            --source-commit "$SOURCE_COMMIT" \
             --cli-url "$base/$(basename "$cli")" \
             --daemon-url "$base/$(basename "$daemon")" \
-            --desktop-min "${{ inputs.desktop_min }}" \
-            --desktop-max "${{ inputs.desktop_max }}" \
+            --desktop-min "$DESKTOP_MIN" \
+            --desktop-max "$DESKTOP_MAX" \
             --min-os-version "$min_os" \
             "${libc[@]}" \
             --output "dist/candidate-${{ matrix.target }}.json"
