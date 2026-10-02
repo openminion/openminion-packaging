@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
@@ -16,8 +17,16 @@ build = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader
 SPEC.loader.exec_module(build)
 
+VERSION = "0.0.28"
+COMMIT = "01ef455f337422eefe81a3084c4352d85924e78d"
+WHEEL_SHA256 = "a" * 64
+WHEEL_URL = (
+    "https://files.pythonhosted.org/packages/example/"
+    f"openminion-{VERSION}-py3-none-any.whl"
+)
 
-def create_wheel(path: Path, version: str = build.OPENMINION_VERSION) -> None:
+
+def create_wheel(path: Path, version: str = VERSION) -> None:
     metadata = f"""Metadata-Version: 2.4
 Name: openminion
 Version: {version}
@@ -29,19 +38,53 @@ Requires-Dist: scrapling>=0.2.0; extra == \"fetch-scrapling\"
 
 
 class BuildContractTests(unittest.TestCase):
-    def test_release_request_must_match_reviewed_pin(self) -> None:
-        build.verify_release_request(
-            build.OPENMINION_VERSION,
-            build.OPENMINION_COMMIT,
-        )
+    def test_release_request_must_match_production_pypi(self) -> None:
+        metadata = {
+            "info": {"name": "openminion", "version": VERSION},
+            "urls": [
+                {
+                    "filename": f"openminion-{VERSION}-py3-none-any.whl",
+                    "url": WHEEL_URL,
+                    "digests": {"sha256": WHEEL_SHA256},
+                    "packagetype": "bdist_wheel",
+                    "yanked": False,
+                }
+            ],
+        }
+        response = io.BytesIO(json.dumps(metadata).encode())
+        with patch.object(build.urllib.request, "urlopen", return_value=response):
+            request = build.verify_release_request(
+                VERSION,
+                COMMIT,
+                WHEEL_URL,
+                WHEEL_SHA256,
+            )
+        self.assertEqual(request["source_commit"], COMMIT)
         with self.assertRaisesRegex(ValueError, "stable three-part"):
-            build.verify_release_request("0.0.28rc1", build.OPENMINION_COMMIT)
-        with self.assertRaisesRegex(ValueError, "packaging pin"):
-            build.verify_release_request("0.0.29", build.OPENMINION_COMMIT)
+            build.release_request("0.0.28rc1", COMMIT, WHEEL_URL, WHEEL_SHA256)
         with self.assertRaisesRegex(ValueError, "full lowercase"):
-            build.verify_release_request(build.OPENMINION_VERSION, "main")
-        with self.assertRaisesRegex(ValueError, "source commit"):
-            build.verify_release_request(build.OPENMINION_VERSION, "a" * 40)
+            build.release_request(VERSION, "main", WHEEL_URL, WHEEL_SHA256)
+        with self.assertRaisesRegex(ValueError, "official PyPI wheel"):
+            build.release_request(
+                VERSION,
+                COMMIT,
+                f"https://example.com/openminion-{VERSION}-py3-none-any.whl",
+                WHEEL_SHA256,
+            )
+        with self.assertRaisesRegex(ValueError, "full lowercase digest"):
+            build.release_request(VERSION, COMMIT, WHEEL_URL, "invalid")
+
+    def test_release_request_rejects_pypi_metadata_drift(self) -> None:
+        metadata = {
+            "info": {"name": "openminion", "version": VERSION},
+            "urls": [],
+        }
+        response = io.BytesIO(json.dumps(metadata).encode())
+        with (
+            patch.object(build.urllib.request, "urlopen", return_value=response),
+            self.assertRaisesRegex(ValueError, "production PyPI metadata"),
+        ):
+            build.verify_release_request(VERSION, COMMIT, WHEEL_URL, WHEEL_SHA256)
 
     def test_private_manifest_accepts_uncertified_prototype_but_never_promotes(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -57,8 +100,8 @@ class BuildContractTests(unittest.TestCase):
                     "publishing": False,
                     "role": role,
                     "wheel": {
-                        "version": build.OPENMINION_VERSION,
-                        "commit": build.OPENMINION_COMMIT,
+                        "version": VERSION,
+                        "commit": COMMIT,
                     },
                     "artifact": {
                         "filename": artifact.name,
@@ -74,7 +117,7 @@ class BuildContractTests(unittest.TestCase):
                 )
             arguments = {
                 "release_id": "private.1",
-                "source_commit": build.OPENMINION_COMMIT,
+                "source_commit": COMMIT,
                 "cli_url": "https://staging.example.invalid/" + artifacts["cli"].name,
                 "daemon_url": "https://staging.example.invalid/"
                 + artifacts["daemon"].name,
@@ -135,11 +178,11 @@ class BuildContractTests(unittest.TestCase):
             "distribution": "binary",
             "channel": "stable",
             "promotion_status": "candidate",
-            "runtime_version": build.OPENMINION_VERSION,
+            "runtime_version": VERSION,
             "release_id": "private.1",
             "published_at": "2026-09-20T00:00:00Z",
-            "source_commit": build.OPENMINION_COMMIT,
-            "release_notes_url": f"{build.OPENMINION_SOURCE}/releases/tag/{build.OPENMINION_TAG}",
+            "source_commit": COMMIT,
+            "release_notes_url": f"{build.OPENMINION_SOURCE}/releases/tag/v{VERSION}",
             "desktop_compatibility": {
                 "min_version": "0.0.0",
                 "max_version_exclusive": "1.0.0",
@@ -212,7 +255,7 @@ class BuildContractTests(unittest.TestCase):
             wheel = Path(temp_dir) / "openminion.whl"
             create_wheel(wheel)
             version, requirements = build.wheel_metadata(wheel)
-        self.assertEqual(version, build.OPENMINION_VERSION)
+        self.assertEqual(version, VERSION)
         self.assertEqual(requirements, ["httpx<1,>=0.27"])
 
     def test_local_wheel_requires_matching_hash(self) -> None:
@@ -221,7 +264,7 @@ class BuildContractTests(unittest.TestCase):
             create_wheel(wheel)
             expected = build.sha256(wheel)
             version, _, actual = build.verify_wheel(wheel, "local", expected)
-        self.assertEqual(version, build.OPENMINION_VERSION)
+        self.assertEqual(version, VERSION)
         self.assertEqual(actual, expected)
 
     def test_local_wheel_rejects_hash_mismatch(self) -> None:
@@ -231,9 +274,32 @@ class BuildContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "local wheel SHA-256 mismatch"):
                 build.verify_wheel(wheel, "local", "0" * 64)
 
+    def test_official_wheel_uses_requested_release_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            wheel = Path(temp_dir) / f"openminion-{VERSION}-py3-none-any.whl"
+            create_wheel(wheel)
+            digest = build.sha256(wheel)
+            version, _, actual = build.verify_wheel(
+                wheel,
+                "pypi",
+                digest,
+                VERSION,
+            )
+            record = build.wheel_record(
+                wheel,
+                version,
+                "pypi",
+                actual,
+                WHEEL_URL,
+                COMMIT,
+            )
+        self.assertEqual(record["origin"], WHEEL_URL)
+        self.assertEqual(record["tag"], f"v{VERSION}")
+        self.assertEqual(record["commit"], COMMIT)
+
     def test_local_wheel_record_does_not_claim_official_source(self) -> None:
         wheel = Path("openminion-local.whl")
-        record = build.wheel_record(wheel, build.OPENMINION_VERSION, "local", "a" * 64)
+        record = build.wheel_record(wheel, VERSION, "local", "a" * 64)
         self.assertEqual(record["origin"], f"local:{wheel.resolve()}")
         self.assertNotIn("source", record)
         self.assertNotIn("tag", record)
@@ -328,7 +394,7 @@ class BuildContractTests(unittest.TestCase):
     def test_pyapp_environment_is_offline_and_isolated(self) -> None:
         target = build.load_target("macos-arm64")
         values = build.pyapp_environment(
-            build.OPENMINION_VERSION,
+            VERSION,
             target,
             Path("runtime.tar.gz"),
             "openminion.daemon_main",
