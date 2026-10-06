@@ -34,7 +34,36 @@ permissions:
   contents: read
 
 jobs:
+  signing-preflight:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    environment: runtime-signing
+    env:
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_SIGNING_CERTIFICATE_P12_BASE64 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_SIGNING_CERTIFICATE_PASSWORD }}
+      MACOS_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_NOTARY_APP_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_NOTARY_TEAM_ID }}
+      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PFX_BASE64 }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+      WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_SIGNING_TIMESTAMP_URL }}
+    steps:
+      - name: Require native signing configuration
+        shell: bash
+        run: |
+          test -n "$MACOS_CERTIFICATE"
+          test -n "$MACOS_CERTIFICATE_PASSWORD"
+          test -n "$MACOS_IDENTITY"
+          test -n "$APPLE_ID"
+          test -n "$APPLE_PASSWORD"
+          test -n "$APPLE_TEAM_ID"
+          test -n "$WINDOWS_CERTIFICATE"
+          test -n "$WINDOWS_CERTIFICATE_PASSWORD"
+          test -n "$WINDOWS_TIMESTAMP_URL"
+
   prepare:
+    needs: signing-preflight
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     env:
