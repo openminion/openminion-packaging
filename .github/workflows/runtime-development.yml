@@ -131,6 +131,7 @@ jobs:
           daemon=$(find dist -maxdepth 1 -name 'openminiond-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
           python packaging/smoke.py --cli "$cli" --daemon "$daemon" --version "${{ inputs.runtime_version }}"
       - name: Stage the verified unsigned binaries
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
