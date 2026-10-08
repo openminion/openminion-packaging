@@ -150,7 +150,9 @@ jobs:
           VERSION: ${{ inputs.runtime_version }}
         shell: bash
         run: |
-          assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          assets=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -r \
+            --arg tag "$TAG" '.[] | select(.tag_name == $tag) | .assets[].name')
+          test -n "$assets"
           for name in \
             "openminion-${VERSION}-macos-arm64" \
             "openminiond-${VERSION}-macos-arm64" \
