@@ -1,13 +1,21 @@
 # OpenMinion Standalone Packaging Releases
 
-Status: candidate production enabled; stable promotion remains gated
-Last updated: 2026-10-01
+Status: signed candidate and unsigned development publication enabled
+Last updated: 2026-10-08
 
 This repository produces private native release candidates. The
 `Runtime candidates` workflow builds paired `openminion` and `openminiond`
 executables from the exact official OpenMinion wheel, verifies their bytes,
 starts the real daemon, probes `/health`, and records one cross-platform
 candidate identity in a private draft release.
+
+The separate `Runtime development binaries` workflow builds and smoke-tests the
+same paired executables without signing. It exists so every final source release
+can have complete macOS arm64, Linux x86_64, and Windows x86_64 binaries while
+signing is unavailable. Its outputs may be transferred only to an explicitly
+unsigned prerelease in `openminion/runtime`; they never enter the stable binary
+manifest and do not satisfy signing, native trust, Desktop compatibility, or
+automatic-update acceptance.
 
 Every request supplies the final three-part runtime version, full source commit,
 official production wheel URL, and SHA-256. The workflow independently checks
@@ -84,9 +92,28 @@ Stable binary promotion remains disabled until all of these are complete:
 7. central verification of those public bytes followed by the protected
    runtime-metadata PR and human merge commit.
 
-Never publish an unsigned artifact or a binary produced from a dirty or
-unreviewed commit. A successful candidate workflow is necessary evidence, not
-release authorization.
+Never publish an unsigned artifact as a stable runtime or publish a binary
+produced from a dirty or unreviewed commit. A successful signed candidate
+workflow is necessary evidence for stable promotion, not release authorization.
+
+## Unsigned development sequence
+
+Use this sequence after the final PyPI wheel and source tag are public:
+
+1. dispatch **Runtime development binaries** from packaging `main` with the
+   exact runtime version, source commit, wheel URL, and wheel SHA-256,
+2. require all three native jobs and the completion inventory to pass,
+3. transfer every `openminion` and `openminiond` executable, its `.json`
+   metadata, and its `.sha256` sidecar from the private draft to a public
+   `runtime-dev-v<version>-build.<number>` prerelease,
+4. add `runtime-release.json` and `SHA256SUMS`, clearly recording that signing,
+   notarization, stable-feed promotion, and Desktop qualification are absent,
+5. download every public asset again and verify its SHA-256, and
+6. delete the temporary private draft only after the public readback passes.
+
+This is the required binary disposition for a source release while signing is
+unavailable. It is intentionally separate from the signed candidate and
+promotion sequence below.
 
 ## Signed promotion sequence
 
