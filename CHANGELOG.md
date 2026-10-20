@@ -11,6 +11,9 @@ Last updated: 2026-10-20
   evidence rather than current-release readiness.
 - Routed manual release inputs through quoted environment variables and added a
   regression check against direct shell interpolation.
+- Added direct private-reporting and support links, made hosted verification
+  pending in the public-readiness status, and recorded third-party
+  redistribution evidence as an explicit binary-release gate.
 - Prepared the repository for public source visibility without changing the
   candidate, signing, or stable-publication gates.
 - Replaced repository-privacy assumptions with explicit restricted-draft and

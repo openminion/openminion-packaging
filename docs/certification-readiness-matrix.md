@@ -12,6 +12,7 @@ not certified
 | Native Linux x86-64 candidate | Historical OpenMinion 0.0.29 paired executables passed the offline CLI/daemon smoke and staged candidate evidence. | Historical pass |
 | Native Windows x86-64 candidate | Historical OpenMinion 0.0.29 paired executables built successfully; signing and later smoke stages were blocked because the Windows certificate, password, and timestamp URL were not configured. | Historical; signing blocked |
 | Official dependency closure | The tracked target locks reproduce from the official OpenMinion 0.0.29 wheel after the reviewed SQLAlchemy 2.1.2 refresh. | Historical pass |
+| Third-party redistribution evidence | Artifact metadata records installed package names, versions, and declared licenses; a reviewed consolidated notice/SBOM has not been published with the binaries. | Pending |
 | Cross-platform candidate identity | Aggregation remains fail-closed until all three signed target jobs and fresh-host verification jobs pass. | Blocked on signing |
 | Disposable Windows 11 acceptance | End-user launch and command flow have not been certified on a clean host. | Pending |
 | Windows build-time budget | Prototype timing needs a release-owner decision. | Pending |

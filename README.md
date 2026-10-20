@@ -1,6 +1,7 @@
 # OpenMinion Standalone Packaging
 
-Status: public-source ready; stable binary promotion remains gated
+Status: public-source conversion prepared; hosted verification pending; stable
+binary promotion remains gated
 
 This repository builds target-specific OpenMinion command-line executables from
 the official `openminion` wheel. It owns packaging and release mechanics only;

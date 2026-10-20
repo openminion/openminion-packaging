@@ -12,6 +12,10 @@ requirements remain open.
 
 ## Getting help
 
+For non-sensitive packaging defects, open a
+[repository issue](https://github.com/openminion/openminion-packaging/issues/new).
+Use the private reporting path in [SECURITY.md](SECURITY.md) for vulnerabilities.
+
 Include:
 
 1. the packaging commit and target identifier,

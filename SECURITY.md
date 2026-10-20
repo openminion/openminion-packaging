@@ -5,9 +5,10 @@
 Do not open a public issue containing exploit details, credentials, signing
 material, non-public build evidence, or unreleased artifact locations.
 
-Contact the OpenMinion maintainers through the established private security
-channel. If that channel is unavailable, request a secure handoff without
-including sensitive details.
+Use
+[GitHub private vulnerability reporting](https://github.com/openminion/openminion-packaging/security/advisories/new).
+If that form is unavailable, ask an OpenMinion organization owner for a
+secure handoff without including sensitive details in an issue or discussion.
 
 ## Scope
 
