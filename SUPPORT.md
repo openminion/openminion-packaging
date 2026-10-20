@@ -2,9 +2,9 @@
 
 ## Current posture
 
-This repository produces private release candidates. Its build scripts and CI
-artifacts are maintained for engineering qualification, not as supported public
-downloads.
+This repository produces release candidates and unsigned development builds.
+Its source may be public, but candidate and draft artifacts remain engineering
+evidence rather than supported downloads.
 
 Current evidence covers native candidate construction for macOS ARM64, Linux
 x86-64, and Windows x86-64. The certification matrix records which release
@@ -18,7 +18,7 @@ Include:
 2. the exact command or workflow run,
 3. the OpenMinion wheel filename and hash,
 4. whether the failure affects the CLI, daemon, or both, and
-5. the failure output with credentials and private URLs removed.
+5. the failure output with credentials and restricted URLs removed.
 
 OpenMinion runtime behavior and Desktop packaging belong to their owning
 repositories. Provider outages, host configuration, and unsigned candidate
