@@ -33,11 +33,15 @@ make check
 This proves formatting, lint, unit contracts, and workflow syntax. It does not
 prove that an executable runs correctly on every target.
 
+The read-only `CI` workflow runs this same gate for pull requests and pushes to
+`dev` and `main`. Use its `Repository check` job as the required branch status
+check after public conversion.
+
 ## Native candidate evidence
 
 Use the manual GitHub `Runtime candidates` workflow for the three-target
 matrix. A successful run proves that the pinned inputs build on native GitHub
-runners and that each paired candidate staged in its private draft release:
+runners and that each paired candidate staged in its restricted draft release:
 
 - matches its generated metadata and checksum,
 - exposes the exact expected CLI version,
@@ -54,4 +58,4 @@ The following remain separate from a green prototype workflow:
 - immutable public runtime release and protected manifest publication
 
 Record only the evidence actually run. Do not infer public availability from a
-local build or private draft release.
+local build or restricted draft release.

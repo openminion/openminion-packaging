@@ -2,7 +2,8 @@
 
 | Path | Ownership |
 | --- | --- |
-| `.github/workflows/runtime-candidates.yml` | Manual native candidate matrix, paired smoke checks, and private draft-release staging. |
+| `.github/workflows/ci.yml` | Read-only pull-request and branch quality gate. |
+| `.github/workflows/runtime-candidates.yml` | Manual native candidate matrix, paired smoke checks, and restricted draft-release staging. |
 | `packaging/build.py` | Canonical local and continuous-integration build implementation. |
 | `packaging/locks/` | Hashed dependency inputs for each supported target. |
 | `packaging/python-distributions.json` | Target Python runtime identities, paths, and checksums. |

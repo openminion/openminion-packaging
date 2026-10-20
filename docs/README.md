@@ -1,7 +1,7 @@
 # Packaging documentation
 
-This documentation covers the private OpenMinion standalone-packaging
-candidate pipeline. It describes this repository's build contract, validation, and
+This documentation covers the OpenMinion standalone-packaging candidate
+pipeline. It describes this repository's build contract, validation, and
 release boundary without duplicating OpenMinion runtime documentation.
 
 ## Guides

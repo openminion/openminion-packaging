@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Do not open a public issue containing exploit details, credentials, signing
-material, private repository contents, or unreleased artifact locations.
+material, non-public build evidence, or unreleased artifact locations.
 
 Contact the OpenMinion maintainers through the established private security
 channel. If that channel is unavailable, request a secure handoff without
