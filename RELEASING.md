@@ -1,7 +1,8 @@
 # OpenMinion Standalone Packaging Releases
 
-Status: signed candidate and unsigned development publication enabled
-Last updated: 2026-10-19
+Status: release workflows implemented; tracked locks last qualify OpenMinion
+0.0.29; signed promotion not configured
+Last updated: 2026-10-20
 
 This repository produces restricted native release candidates. The
 `Runtime candidates` workflow builds paired `openminion` and `openminiond`
@@ -33,8 +34,8 @@ native qualification:
 python3.11 packaging/build.py candidate-manifest --help
 ```
 
-Supply its exact source commit, release identity, fixed restricted HTTPS artifact
-URLs, proposed Desktop bounds and native OS baseline. Linux also requires the
+Supply its exact source commit, release identity, fixed HTTPS artifact URLs,
+proposed Desktop bounds and native OS baseline. Linux also requires the
 proposed glibc minimum. The output always has `promotion_status: candidate`;
 proposed bounds are not certification. `merge-candidates` combines the three
 native records without changing that status.
@@ -87,9 +88,11 @@ Stable binary promotion remains disabled until all of these are complete:
 4. clean-host native verification with recorded verification IDs,
 5. Desktop install, activation, restart, reply-continuity, rollback, and
    uninstall evidence for explicit compatibility bounds,
-6. an immutable public `openminion/runtime` GitHub Release containing the exact
+6. a reviewed third-party license inventory plus every required notice and
+   source-offer artifact for the bundled Python, PyApp, and native runtime,
+7. an immutable public `openminion/runtime` GitHub Release containing the exact
    executables, `candidate.json`, and `verification.json`,
-7. central verification of those public bytes followed by the protected
+8. central verification of those public bytes followed by the protected
    runtime-metadata PR and human merge commit.
 
 Never publish an unsigned artifact as a stable runtime or publish a binary
@@ -106,10 +109,12 @@ Use this sequence after the final PyPI wheel and source tag are public:
 3. transfer every `openminion` and `openminiond` executable, its `.json`
    metadata, and its `.sha256` sidecar from the restricted draft to a public
    `runtime-dev-v<version>-build.<number>` prerelease,
-4. add `runtime-release.json` and `SHA256SUMS`, clearly recording that signing,
+4. include the reviewed third-party license inventory and required notices for
+   the exact bundled dependency set,
+5. add `runtime-release.json` and `SHA256SUMS`, clearly recording that signing,
    notarization, stable-feed promotion, and Desktop qualification are absent,
-5. download every public asset again and verify its SHA-256, and
-6. delete the temporary draft only after the public readback passes.
+6. download every public asset again and verify its SHA-256, and
+7. delete the temporary draft only after the public readback passes.
 
 This is the required binary disposition for a source release while signing is
 unavailable. It is intentionally separate from the signed candidate and
@@ -124,8 +129,9 @@ promotion sequence below.
    `candidate.json` describes the final signed bytes and `verification.json`
    carries one passing native identity for every supported target.
 3. Configure the `runtime-publication` secret environment with the
-   runtime-publisher GitHub App ID/private key. The App needs contents write only on
-   `openminion/runtime`. Enable immutable Releases there before the first use.
+   runtime-publisher GitHub App ID/private key. The App needs contents write
+   only on `openminion/runtime`. Enable immutable Releases there before the
+   first use.
 4. Approve **Runtime promotion** with the exact candidate tag and a new release
    ID. It publishes the immutable runtime Release but deliberately leaves the
    OpenMinion stable feed unchanged.
@@ -148,23 +154,29 @@ Repository visibility changes source access and Actions billing; it does not
 change artifact status or publication authority. Complete this checklist when
 the repository is made public:
 
+The current GitHub Free organization cannot preconfigure branch protection
+while this repository is private. After changing visibility, configure the
+first checklist item before accepting any other repository change.
+
 1. require pull requests and the passing `CI / Repository check` status for
    `main` and `dev`, and block force pushes and branch deletion,
-2. retain read-only default workflow permissions and grant write permissions
+2. enable GitHub private vulnerability reporting and verify the link in
+   `SECURITY.md` from a non-maintainer session,
+3. retain read-only default workflow permissions and grant write permissions
    only to the jobs that create restricted draft Releases,
-3. keep `Runtime candidates`, `Runtime development binaries`, and
+4. keep `Runtime candidates`, `Runtime development binaries`, and
    `Runtime promotion` manual and guarded to `refs/heads/main`,
-4. configure required reviewers for `runtime-signing` and
+5. configure required reviewers for `runtime-signing` and
    `runtime-publication` before adding signing or publisher credentials,
-5. confirm that no signing certificate, notarization credential, publisher
+6. confirm that no signing certificate, notarization credential, publisher
    private key, generated binary, wheel, or restricted evidence is tracked in
    Git history,
-6. review existing draft Releases and delete obsolete transfer drafts after
+7. review existing draft Releases and delete obsolete transfer drafts after
    their evidence is no longer needed,
-7. run `make check`, then dispatch one unsigned development build with an exact
+8. run `make check`, then dispatch one unsigned development build with an exact
    production release identity and verify every public runtime asset after its
    controlled transfer, and
-8. leave stable manifest publication disabled until the signed qualification
+9. leave stable manifest publication disabled until the signed qualification
    and Desktop compatibility gates above are satisfied.
 
 Public workflow logs and source code are expected. Draft Release assets remain
