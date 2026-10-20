@@ -34,8 +34,8 @@ This proves formatting, lint, unit contracts, and workflow syntax. It does not
 prove that an executable runs correctly on every target.
 
 The read-only `CI` workflow runs this same gate for pull requests and pushes to
-`dev` and `main`. Use its `Repository check` job as the required branch status
-check after public conversion.
+`dev` and `main`. Its `Repository check` job is the required protected-branch
+status check.
 
 ## Native candidate evidence
 
@@ -55,7 +55,7 @@ The following remain separate from a green prototype workflow:
 - disposable Windows 11 acceptance
 - signing and notarization
 - install, upgrade, rollback, and uninstall behavior
-- immutable public runtime release and protected manifest publication
+- signed stable runtime release and protected manifest publication
 
 Record only the evidence actually run. Do not infer public availability from a
 local build or restricted draft release.

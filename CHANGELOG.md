@@ -5,6 +5,8 @@ Last updated: 2026-10-20
 
 ## Unreleased
 
+- Refreshed official GitHub Actions pins to their current Node.js 24 releases
+  and recorded the completed public-source and Git-history audit.
 - Aligned public documentation with the current CI, candidate, development,
   and promotion workflow boundaries.
 - Marked the tracked 0.0.29 locks and candidate run as historical qualification
@@ -14,8 +16,8 @@ Last updated: 2026-10-20
   regression coverage against direct shell interpolation.
 - Restricted downloads to approved HTTPS hosts and used Python's data filter
   when extracting pinned runtime archives.
-- Added direct private-reporting and support links, made hosted verification
-  pending in the public-readiness status, and recorded third-party
+- Added direct private-reporting and support links, completed post-conversion
+  hosted CI verification, and recorded third-party
   redistribution evidence as an explicit binary-release gate.
 - Prepared the repository for public source visibility without changing the
   candidate, signing, or stable-publication gates.

@@ -5,6 +5,7 @@ not certified
 
 | Capability | Current evidence | State |
 | --- | --- | --- |
+| Public source visibility | Protected `main` and `dev`, read-only default Actions permissions, private vulnerability reporting, secret scanning with push protection, and the 2026-10-20 tracked-history audit are active. | Ready |
 | Repository documentation and governance | Root policies and package-local guides are present and structurally tested. | Ready |
 | Local code-quality gate | Ruff, unit tests, and actionlint are grouped under `make check`. | Ready |
 | Reproducible input contract | Wheel versions, hashes, dependency locks, and target runtime hashes are explicit. | Ready |
@@ -18,7 +19,7 @@ not certified
 | Windows build-time budget | Prototype timing needs a release-owner decision. | Pending |
 | Signing and notarization | Fail-closed macOS signing/notarization and Windows Authenticode steps are implemented; their protected-environment credentials are not configured. | Blocked on credentials |
 | Desktop staging behavior | Paired executable download, digest verification, pending activation, pause and pin contracts are implemented in Desktop. | Implemented; native acceptance pending |
-| Immutable public release | Public `openminion/runtime` release bytes and final native verification evidence do not yet exist. | Pending |
+| Immutable public release | Public `openminion/runtime` prereleases contain explicitly unsigned development bytes; no signed stable release with final native verification exists. | Development only; stable pending |
 | Stable manifest publication | Central verification and protected metadata-PR support are implemented; no binary record may publish before the immutable release gate. | Gated |
 | Public release | Publication is not authorized and no supported binary download is claimed. | Blocked |
 
