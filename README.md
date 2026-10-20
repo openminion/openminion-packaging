@@ -1,6 +1,7 @@
 # OpenMinion Standalone Packaging
 
-Status: public-source ready; stable binary promotion remains gated
+Status: public-source conversion prepared; hosted verification pending; stable
+binary promotion remains gated
 
 This repository builds target-specific OpenMinion command-line executables from
 the official `openminion` wheel. It owns packaging and release mechanics only;
@@ -32,6 +33,11 @@ The native candidate targets are:
 
 The build uses Python 3.11, `uv==0.9.21`, Rust `1.89.0`, and PyApp `0.29.0`.
 Run it only on the matching native platform.
+
+The tracked target locks are the last reviewed `0.0.29` qualification inputs,
+not an alias for the latest PyPI release. A different source release is
+intentionally rejected until a packaging PR refreshes and reviews every target
+lock from that release's exact wheel.
 
 Resolve the exact released wheel identity, then validate its target lock and
 build the paired CLI and daemon executables:
@@ -78,7 +84,8 @@ evidence only, not a supported public release.
 ## Repository boundary
 
 - `packaging/` owns the single local and CI build implementation.
-- `.github/workflows/runtime-candidates.yml` invokes that same implementation.
+- `.github/workflows/` owns read-only CI, candidate builds, unsigned development
+  builds, and the separately gated promotion workflow.
 - `tests/` protects input, lock, platform, and metadata contracts.
 - `docs/` explains package-local operation and evidence boundaries.
 - `dist/` and `wheel/` are generated and never committed.

@@ -15,6 +15,14 @@ Builds consume explicit wheel files, versions, and SHA-256 identities. Target
 metadata lives in `packaging/python-distributions.json`; dependency resolution
 is frozen in `packaging/locks/`.
 
+Map manual workflow inputs, matrix values, and upstream job outputs into
+environment variables and pass them as quoted arguments. Never interpolate a
+GitHub expression directly into a shell script, especially in signing or
+publication jobs.
+
+Accept remote build inputs only from approved HTTPS hosts, verify their pinned
+digest before use, and extract archives through Python's data filter.
+
 ## Native builds
 
 Each executable is built on its target platform. Do not add cross-compilation

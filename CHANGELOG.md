@@ -1,10 +1,22 @@
 # OpenMinion Packaging Changelog
 
 Status: active
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 ## Unreleased
 
+- Aligned public documentation with the current CI, candidate, development,
+  and promotion workflow boundaries.
+- Marked the tracked 0.0.29 locks and candidate run as historical qualification
+  evidence rather than current-release readiness.
+- Routed manual release inputs, matrix targets, and upstream job outputs through
+  quoted environment variables; serialized manual release workflows; and added
+  regression coverage against direct shell interpolation.
+- Restricted downloads to approved HTTPS hosts and used Python's data filter
+  when extracting pinned runtime archives.
+- Added direct private-reporting and support links, made hosted verification
+  pending in the public-readiness status, and recorded third-party
+  redistribution evidence as an explicit binary-release gate.
 - Prepared the repository for public source visibility without changing the
   candidate, signing, or stable-publication gates.
 - Replaced repository-privacy assumptions with explicit restricted-draft and

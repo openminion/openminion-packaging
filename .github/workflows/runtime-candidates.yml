@@ -33,8 +33,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   signing-preflight:
+    name: Validate signing configuration
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     environment: runtime-signing
@@ -63,6 +68,7 @@ jobs:
           test -n "$WINDOWS_TIMESTAMP_URL"
 
   prepare:
+    name: Verify release and create draft
     needs: signing-preflight
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
@@ -72,7 +78,7 @@ jobs:
       WHEEL_URL: ${{ inputs.wheel_url }}
       WHEEL_SHA256: ${{ inputs.wheel_sha256 }}
     permissions:
-      contents: write
+      contents: write # Creates the restricted draft candidate Release.
     outputs:
       tag: ${{ steps.release.outputs.tag }}
     steps:
@@ -115,6 +121,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   build:
+    name: Build and sign ${{ matrix.target }}
     needs: prepare
     strategy:
       fail-fast: false
@@ -135,8 +142,10 @@ jobs:
       WHEEL_SHA256: ${{ inputs.wheel_sha256 }}
       DESKTOP_MIN: ${{ inputs.desktop_min }}
       DESKTOP_MAX: ${{ inputs.desktop_max }}
+      CANDIDATE_TAG: ${{ needs.prepare.outputs.tag }}
+      TARGET: ${{ matrix.target }}
     permissions:
-      contents: write
+      contents: write # Uploads artifacts to the restricted draft Release.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -149,7 +158,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir wheel
-          gh release download "${{ needs.prepare.outputs.tag }}" --pattern '*.whl' --dir wheel
+          gh release download "$CANDIDATE_TAG" --pattern '*.whl' --dir wheel
       - name: Install pinned build tools
         run: |
           python -m pip install uv==0.9.21
@@ -165,9 +174,9 @@ jobs:
             --wheel-sha256 "$WHEEL_SHA256"
             --source-commit "$SOURCE_COMMIT"
           )
-          python packaging/build.py lock --target "${{ matrix.target }}" --wheel "$wheel" "${release[@]}" --check
-          python packaging/build.py build --target "${{ matrix.target }}" --wheel "$wheel" "${release[@]}"
-          for artifact in dist/openminion-*-${{ matrix.target }}* dist/openminiond-*-${{ matrix.target }}*; do
+          python packaging/build.py lock --target "$TARGET" --wheel "$wheel" "${release[@]}" --check
+          python packaging/build.py build --target "$TARGET" --wheel "$wheel" "${release[@]}"
+          for artifact in dist/openminion-*-"$TARGET"* dist/openminiond-*-"$TARGET"*; do
             case "$artifact" in *.json|*.sha256) continue;; esac
             python packaging/build.py verify --artifact "$artifact"
           done
@@ -240,7 +249,7 @@ jobs:
       - name: Bind metadata to final signed bytes
         shell: bash
         run: |
-          for artifact in dist/openminion-*-${{ matrix.target }}* dist/openminiond-*-${{ matrix.target }}*; do
+          for artifact in dist/openminion-*-"$TARGET"* dist/openminiond-*-"$TARGET"*; do
             case "$artifact" in *.json|*.sha256) continue;; esac
             python packaging/build.py refresh-artifact --artifact "$artifact"
           done
@@ -252,17 +261,17 @@ jobs:
           ALL_PROXY: http://127.0.0.1:9
           NO_PROXY: 127.0.0.1,localhost
         run: |
-          cli=$(find dist -maxdepth 1 -name 'openminion-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
-          daemon=$(find dist -maxdepth 1 -name 'openminiond-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
+          cli=$(find dist -maxdepth 1 -name "openminion-*-$TARGET*" ! -name '*.json' ! -name '*.sha256' -print -quit)
+          daemon=$(find dist -maxdepth 1 -name "openminiond-*-$TARGET*" ! -name '*.json' ! -name '*.sha256' -print -quit)
           version=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["wheel"]["version"])' "$cli.json")
           python packaging/smoke.py --cli "$cli" --daemon "$daemon" --version "$version"
       - name: Describe exact private candidate bytes
         shell: bash
         run: |
-          cli=$(find dist -maxdepth 1 -name 'openminion-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
-          daemon=$(find dist -maxdepth 1 -name 'openminiond-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
-          base="https://github.com/openminion/openminion-packaging/releases/download/${{ needs.prepare.outputs.tag }}"
-          case "${{ matrix.target }}" in
+          cli=$(find dist -maxdepth 1 -name "openminion-*-$TARGET*" ! -name '*.json' ! -name '*.sha256' -print -quit)
+          daemon=$(find dist -maxdepth 1 -name "openminiond-*-$TARGET*" ! -name '*.json' ! -name '*.sha256' -print -quit)
+          base="https://github.com/openminion/openminion-packaging/releases/download/$CANDIDATE_TAG"
+          case "$TARGET" in
             macos-arm64)
               min_os=$(sw_vers -productVersion)
               ;;
@@ -277,7 +286,7 @@ jobs:
           min_os=${min_os//$'\r'/}
           test -n "$min_os"
           libc=()
-          if [ "${{ matrix.target }}" = "linux-x86_64" ]; then
+          if [ "$TARGET" = "linux-x86_64" ]; then
             min_libc=$(node -p 'process.report.getReport().header.glibcVersionRuntime || ""')
             test -n "$min_libc"
             libc=(--min-libc-version "$min_libc")
@@ -293,18 +302,19 @@ jobs:
             --desktop-max "$DESKTOP_MAX" \
             --min-os-version "$min_os" \
             "${libc[@]}" \
-            --output "dist/candidate-${{ matrix.target }}.json"
+            --output "dist/candidate-$TARGET.json"
       - name: Stage verified candidate evidence
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${{ needs.prepare.outputs.tag }}" \
-            dist/openminion-*-${{ matrix.target }}* \
-            dist/openminiond-*-${{ matrix.target }}* \
-            dist/candidate-${{ matrix.target }}.json
+          gh release upload "$CANDIDATE_TAG" \
+            dist/openminion-*-"$TARGET"* \
+            dist/openminiond-*-"$TARGET"* \
+            "dist/candidate-$TARGET.json"
 
   verify-native:
+    name: Verify ${{ matrix.target }} on fresh runner
     needs: [prepare, build]
     strategy:
       fail-fast: false
@@ -317,8 +327,11 @@ jobs:
           - runner: ubuntu-22.04
             target: linux-x86_64
     runs-on: ${{ matrix.runner }}
+    env:
+      CANDIDATE_TAG: ${{ needs.prepare.outputs.tag }}
+      TARGET: ${{ matrix.target }}
     permissions:
-      contents: write
+      contents: write # Uploads fresh-host verification to the draft Release.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -332,8 +345,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir dist
-          gh release download "${{ needs.prepare.outputs.tag }}" \
-            --pattern '*-${{ matrix.target }}*' \
+          gh release download "$CANDIDATE_TAG" \
+            --pattern "*-$TARGET*" \
             --dir dist
       - name: Verify macOS signing and Gatekeeper trust on the fresh runner
         if: matrix.target == 'macos-arm64'
@@ -364,26 +377,29 @@ jobs:
           ALL_PROXY: http://127.0.0.1:9
           NO_PROXY: 127.0.0.1,localhost
         run: |
-          cli=$(find dist -maxdepth 1 -name 'openminion-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
-          daemon=$(find dist -maxdepth 1 -name 'openminiond-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
+          cli=$(find dist -maxdepth 1 -name "openminion-*-$TARGET*" ! -name '*.json' ! -name '*.sha256' -print -quit)
+          daemon=$(find dist -maxdepth 1 -name "openminiond-*-$TARGET*" ! -name '*.json' ! -name '*.sha256' -print -quit)
           python packaging/build.py verify --artifact "$cli"
           python packaging/build.py verify --artifact "$daemon"
           version=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["wheel"]["version"])' "$cli.json")
           python packaging/smoke.py --cli "$cli" --daemon "$daemon" --version "$version"
           python packaging/build.py native-verification \
-            --target "${{ matrix.target }}" \
-            --verification-id "native.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}.${{ matrix.target }}" \
-            --output "verification-${{ matrix.target }}.json"
+            --target "$TARGET" \
+            --verification-id "native.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}.$TARGET" \
+            --output "verification-$TARGET.json"
       - name: Stage fresh-host verification evidence
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ needs.prepare.outputs.tag }}" "verification-${{ matrix.target }}.json"
+        run: gh release upload "$CANDIDATE_TAG" "verification-$TARGET.json"
 
   aggregate:
+    name: Aggregate candidate evidence
     needs: [prepare, build, verify-native]
     runs-on: ubuntu-22.04
+    env:
+      CANDIDATE_TAG: ${{ needs.prepare.outputs.tag }}
     permissions:
-      contents: write
+      contents: write # Uploads aggregate evidence to the draft Release.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -396,7 +412,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir candidate-records
-          gh release download "${{ needs.prepare.outputs.tag }}" \
+          gh release download "$CANDIDATE_TAG" \
             --pattern 'candidate-*.json' \
             --dir candidate-records
       - name: Merge one cross-platform candidate identity
@@ -414,7 +430,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir verification-records
-          gh release download "${{ needs.prepare.outputs.tag }}" \
+          gh release download "$CANDIDATE_TAG" \
             --pattern 'verification-*.json' \
             --dir verification-records
           inputs=()
@@ -423,7 +439,7 @@ jobs:
       - name: Stage aggregate candidate record
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ needs.prepare.outputs.tag }}" candidate.json verification.json
+        run: gh release upload "$CANDIDATE_TAG" candidate.json verification.json
       - name: Record the candidate disposition
         shell: bash
         env:
