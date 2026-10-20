@@ -15,8 +15,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
+    name: Publish verified runtime release
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     timeout-minutes: 30

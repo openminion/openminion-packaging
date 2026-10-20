@@ -9,8 +9,11 @@ Last updated: 2026-10-20
   and promotion workflow boundaries.
 - Marked the tracked 0.0.29 locks and candidate run as historical qualification
   evidence rather than current-release readiness.
-- Routed manual release inputs through quoted environment variables and added a
-  regression check against direct shell interpolation.
+- Routed manual release inputs, matrix targets, and upstream job outputs through
+  quoted environment variables; serialized manual release workflows; and added
+  regression coverage against direct shell interpolation.
+- Restricted downloads to approved HTTPS hosts and used Python's data filter
+  when extracting pinned runtime archives.
 - Added direct private-reporting and support links, made hosted verification
   pending in the public-readiness status, and recorded third-party
   redistribution evidence as an explicit binary-release gate.

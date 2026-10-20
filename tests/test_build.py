@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import re
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,6 +37,24 @@ Requires-Dist: scrapling>=0.2.0; extra == \"fetch-scrapling\"
 """
     with ZipFile(path, "w", ZIP_DEFLATED) as archive:
         archive.writestr(f"openminion-{version}.dist-info/METADATA", metadata)
+
+
+def workflow_shell_scripts(path: Path) -> list[str]:
+    lines = path.read_text().splitlines()
+    scripts = []
+    for index, line in enumerate(lines):
+        match = re.match(r"^(?P<indent>\s*)run:\s*(?P<inline>.*)$", line)
+        if not match:
+            continue
+        indent = len(match["indent"])
+        script = [match["inline"]]
+        for candidate in lines[index + 1 :]:
+            candidate_indent = len(candidate) - len(candidate.lstrip())
+            if candidate.strip() and candidate_indent <= indent:
+                break
+            script.append(candidate)
+        scripts.append("\n".join(script))
+    return scripts
 
 
 class BuildContractTests(unittest.TestCase):
@@ -275,6 +294,27 @@ class BuildContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "local wheel SHA-256 mismatch"):
                 build.verify_wheel(wheel, "local", "0" * 64)
 
+    def test_download_rejects_unapproved_hosts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            destination = Path(temp_dir) / "download"
+            for url in ("file:///tmp/archive", "https://example.com/archive"):
+                with self.assertRaisesRegex(ValueError, "approved HTTPS host"):
+                    build.download(url, destination, "0" * 64)
+
+    def test_python_archive_rejects_unsafe_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            archive = root / "python.tar.gz"
+            payload = b"outside"
+            with tarfile.open(archive, "w:gz") as target:
+                member = tarfile.TarInfo("../outside")
+                member.size = len(payload)
+                target.addfile(member, io.BytesIO(payload))
+
+            with self.assertRaises(tarfile.FilterError):
+                build.extract_python(archive, root / "work")
+            self.assertFalse((root / "outside").exists())
+
     def test_official_wheel_uses_requested_release_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             wheel = Path(temp_dir) / f"openminion-{VERSION}-py3-none-any.whl"
@@ -392,15 +432,20 @@ class BuildContractTests(unittest.TestCase):
         for lock in build.LOCKS_DIR.glob("*.txt"):
             self.assertNotIn(b"\r\n", lock.read_bytes())
 
-    def test_workflow_inputs_enter_shells_through_environment(self) -> None:
+    def test_workflow_values_enter_shells_through_environment(self) -> None:
         workflows = BUILD_PATH.parents[1] / ".github" / "workflows"
         assignment = re.compile(
             r"^\s+[A-Z][A-Z0-9_]*:\s+\$\{\{ inputs\.[a-z0-9_]+ \}\}\s*$"
+        )
+        direct_shell_expansion = re.compile(
+            r"\$\{\{\s*(?:inputs\.|matrix\.|needs\.[^}]+\.outputs\.)"
         )
         for workflow in workflows.glob("*.yml"):
             for line in workflow.read_text().splitlines():
                 if "${{ inputs." in line:
                     self.assertRegex(line, assignment, workflow.name)
+            for script in workflow_shell_scripts(workflow):
+                self.assertNotRegex(script, direct_shell_expansion, workflow.name)
 
     def test_pyapp_environment_is_offline_and_isolated(self) -> None:
         target = build.load_target("macos-arm64")

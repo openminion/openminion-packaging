@@ -26,6 +26,7 @@ LOCKS_DIR = ROOT / "packaging" / "locks"
 
 OPENMINION_SOURCE = "https://github.com/openminion/openminion"
 PYPI_PROJECT_URL = "https://pypi.org/pypi/openminion"
+DOWNLOAD_HOSTS = {"files.pythonhosted.org", "github.com"}
 
 PYAPP_VERSION = "0.29.0"
 PYAPP_SOURCE = "https://github.com/ofek/pyapp"
@@ -88,7 +89,8 @@ def verify_release_request(
 ) -> dict[str, str]:
     """Confirm the authenticated request still matches production PyPI metadata."""
     request = release_request(runtime_version, source_commit, wheel_url, wheel_sha256)
-    with urllib.request.urlopen(
+    # PYPI_PROJECT_URL is a fixed HTTPS endpoint owned by PyPI.
+    with urllib.request.urlopen(  # nosec B310
         f"{PYPI_PROJECT_URL}/{runtime_version}/json", timeout=15
     ) as response:
         metadata = json.load(response)
@@ -481,10 +483,17 @@ def write_lock(
 
 
 def download(url: str, destination: Path, expected_sha256: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.netloc not in DOWNLOAD_HOSTS:
+        raise ValueError("download URL must use an approved HTTPS host")
     if destination.exists() and sha256(destination) == expected_sha256:
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(url) as response, destination.open("wb") as output:
+    # The URL passed this function's exact HTTPS host allowlist.
+    with (
+        urllib.request.urlopen(url) as response,  # nosec B310
+        destination.open("wb") as output,
+    ):
         shutil.copyfileobj(response, output)
     if sha256(destination) != expected_sha256:
         destination.unlink()
@@ -494,7 +503,7 @@ def download(url: str, destination: Path, expected_sha256: str) -> None:
 def extract_python(archive: Path, work_dir: Path) -> Path:
     extracted = work_dir / "python-extracted"
     with tarfile.open(archive, "r:gz") as source:
-        source.extractall(extracted)
+        source.extractall(extracted, filter="data")
     runtime = work_dir / "runtime"
     shutil.move(str(extracted / "python"), runtime)
     return runtime
