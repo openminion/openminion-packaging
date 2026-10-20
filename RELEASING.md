@@ -148,37 +148,38 @@ Do not add the central manifest dispatch back to this repository. Keeping asset
 publication and discoverability separate prevents an unqualified packaged
 Desktop/runtime pair from reaching clients.
 
-## Public repository conversion
+## Public repository safeguards
 
 Repository visibility changes source access and Actions billing; it does not
-change artifact status or publication authority. Complete this checklist when
-the repository is made public:
-
-The current GitHub Free organization cannot preconfigure branch protection
-while this repository is private. After changing visibility, configure the
-first checklist item before accepting any other repository change.
+change artifact status or publication authority. The repository is public and
+the following safeguards are active or must remain active:
 
 1. require pull requests and the passing `CI / Repository check` status for
    `main` and `dev`, and block force pushes and branch deletion,
-2. enable GitHub private vulnerability reporting and verify the link in
+2. keep GitHub private vulnerability reporting enabled and verify the link in
    `SECURITY.md` from a non-maintainer session,
 3. retain read-only default workflow permissions and grant write permissions
    only to the jobs that create restricted draft Releases,
 4. keep `Runtime candidates`, `Runtime development binaries`, and
    `Runtime promotion` manual and guarded to `refs/heads/main`,
-5. configure required reviewers for `runtime-signing` and
+5. keep required reviewers configured for `runtime-signing` and
    `runtime-publication` before adding signing or publisher credentials,
-6. confirm that no signing certificate, notarization credential, publisher
-   private key, generated binary, wheel, or restricted evidence is tracked in
-   Git history,
+6. preserve the audited Git-history boundary: no signing certificate,
+   notarization credential, publisher private key, generated binary, wheel, or
+   restricted evidence may be tracked,
 7. review existing draft Releases and delete obsolete transfer drafts after
    their evidence is no longer needed,
-8. run `make check`, then dispatch one unsigned development build with an exact
-   production release identity and verify every public runtime asset after its
-   controlled transfer, and
+8. run `make check` for every change, then verify every public runtime asset
+   after each controlled unsigned-development transfer, and
 9. leave stable manifest publication disabled until the signed qualification
    and Desktop compatibility gates above are satisfied.
 
 Public workflow logs and source code are expected. Draft Release assets remain
 restricted to repository maintainers until deliberately published or
 transferred to `openminion/runtime`.
+
+The 2026-10-20 public-history audit found only organization or GitHub noreply
+author addresses, conventional commit subjects, no known credential material,
+no private workstation paths, and no generated runtime binaries or wheels.
+History must be rewritten only for a confirmed sensitive-data incident, not to
+cosmetically rename otherwise valid commits.
