@@ -4,6 +4,8 @@
 | --- | --- |
 | `.github/workflows/ci.yml` | Read-only pull-request and branch quality gate. |
 | `.github/workflows/runtime-candidates.yml` | Manual native candidate matrix, paired smoke checks, and restricted draft-release staging. |
+| `.github/workflows/runtime-development.yml` | Manual unsigned native build matrix and restricted transfer staging. |
+| `.github/workflows/runtime-promotion.yml` | Separately approved publication of already verified signed candidates. |
 | `packaging/build.py` | Canonical local and continuous-integration build implementation. |
 | `packaging/locks/` | Hashed dependency inputs for each supported target. |
 | `packaging/python-distributions.json` | Target Python runtime identities, paths, and checksums. |

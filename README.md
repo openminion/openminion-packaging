@@ -78,7 +78,8 @@ evidence only, not a supported public release.
 ## Repository boundary
 
 - `packaging/` owns the single local and CI build implementation.
-- `.github/workflows/runtime-candidates.yml` invokes that same implementation.
+- `.github/workflows/` owns read-only CI, candidate builds, unsigned development
+  builds, and the separately gated promotion workflow.
 - `tests/` protects input, lock, platform, and metadata contracts.
 - `docs/` explains package-local operation and evidence boundaries.
 - `dist/` and `wheel/` are generated and never committed.

@@ -5,6 +5,8 @@ Last updated: 2026-10-19
 
 ## Unreleased
 
+- Aligned public documentation with the current CI, candidate, development,
+  and promotion workflow boundaries.
 - Prepared the repository for public source visibility without changing the
   candidate, signing, or stable-publication gates.
 - Replaced repository-privacy assumptions with explicit restricted-draft and

@@ -6,12 +6,16 @@ Scope: build entrypoints, target identifiers, and emitted artifact metadata
 
 ## Supported operator surface
 
-The repository currently exposes two maintained commands:
+The repository currently exposes two maintained build commands:
 
 ```bash
 python3.11 packaging/build.py lock --help
 python3.11 packaging/build.py build --help
 ```
+
+Release workflows also call package-local verification and metadata helpers.
+Those helper commands are workflow implementation details rather than a stable
+operator API.
 
 The maintained target identifiers are `macos-arm64`, `linux-x86_64`, and
 `windows-x86_64`. Their exact toolchain, Python distribution, and lock inputs

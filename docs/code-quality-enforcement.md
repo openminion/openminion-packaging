@@ -15,9 +15,10 @@ python3.11 -m unittest discover -s tests -p 'test_*.py'
 actionlint
 ```
 
-The manual `Prototype` workflow adds native macOS, Linux, and Windows build
-coverage. A local check proves repository logic and workflow shape; it does not
-replace native target evidence.
+The manual `Runtime candidates` and `Runtime development binaries` workflows
+add native macOS, Linux, and Windows build coverage. A local check proves
+repository logic and workflow shape; it does not replace native target
+evidence.
 
 Generated artifacts belong in ignored `dist/` and `wheel/` directories. Build
 or workflow changes must keep the root documentation, source-tree owner map,

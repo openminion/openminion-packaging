@@ -1,6 +1,7 @@
 # OpenMinion Standalone Packaging Releases
 
-Status: signed candidate and unsigned development publication enabled
+Status: unsigned development publication enabled; signed promotion implemented
+but not configured
 Last updated: 2026-10-19
 
 This repository produces restricted native release candidates. The
@@ -33,8 +34,8 @@ native qualification:
 python3.11 packaging/build.py candidate-manifest --help
 ```
 
-Supply its exact source commit, release identity, fixed restricted HTTPS artifact
-URLs, proposed Desktop bounds and native OS baseline. Linux also requires the
+Supply its exact source commit, release identity, fixed HTTPS artifact URLs,
+proposed Desktop bounds and native OS baseline. Linux also requires the
 proposed glibc minimum. The output always has `promotion_status: candidate`;
 proposed bounds are not certification. `merge-candidates` combines the three
 native records without changing that status.
@@ -124,8 +125,9 @@ promotion sequence below.
    `candidate.json` describes the final signed bytes and `verification.json`
    carries one passing native identity for every supported target.
 3. Configure the `runtime-publication` secret environment with the
-   runtime-publisher GitHub App ID/private key. The App needs contents write only on
-   `openminion/runtime`. Enable immutable Releases there before the first use.
+   runtime-publisher GitHub App ID/private key. The App needs contents write
+   only on `openminion/runtime`. Enable immutable Releases there before the
+   first use.
 4. Approve **Runtime promotion** with the exact candidate tag and a new release
    ID. It publishes the immutable runtime Release but deliberately leaves the
    OpenMinion stable feed unchanged.
@@ -147,6 +149,10 @@ Desktop/runtime pair from reaching clients.
 Repository visibility changes source access and Actions billing; it does not
 change artifact status or publication authority. Complete this checklist when
 the repository is made public:
+
+The current GitHub Free organization cannot preconfigure branch protection
+while this repository is private. After changing visibility, configure the
+first checklist item before accepting any other repository change.
 
 1. require pull requests and the passing `CI / Repository check` status for
    `main` and `dev`, and block force pushes and branch deletion,
