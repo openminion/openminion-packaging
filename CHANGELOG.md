@@ -1,10 +1,18 @@
 # OpenMinion Packaging Changelog
 
 Status: active
-Last updated: 2026-09-21
+Last updated: 2026-10-19
 
 ## Unreleased
 
+- Prepared the repository for public source visibility without changing the
+  candidate, signing, or stable-publication gates.
+- Replaced repository-privacy assumptions with explicit restricted-draft and
+  artifact-promotion boundaries.
+- Documented the shared `dev` to `main` contribution path and public conversion
+  safeguards.
+- Added a read-only pull-request and branch quality workflow for the required
+  repository check.
 - Refreshed all native dependency locks for OpenMinion 0.0.29 after the
   reviewed SQLAlchemy 2.1.2 resolution and documented the required preflight
   lock gate for future source releases.

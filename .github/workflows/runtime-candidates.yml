@@ -100,7 +100,7 @@ jobs:
           --source-commit "$SOURCE_COMMIT"
           --wheel-url "$WHEEL_URL"
           --wheel-sha256 "$WHEEL_SHA256"
-      - name: Create private candidate release
+      - name: Create restricted draft candidate release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -110,7 +110,7 @@ jobs:
             --draft \
             --target "$GITHUB_SHA" \
             --title "Runtime candidate $tag" \
-            --notes "Private paired-runtime artifacts for native qualification. Not a public release."
+            --notes "Restricted draft paired-runtime artifacts for native qualification. Not a supported public release."
           gh release upload "$tag" wheel/*.whl
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 

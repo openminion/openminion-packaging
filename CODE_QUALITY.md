@@ -25,6 +25,7 @@ Run:
 make check
 ```
 
-For build behavior changes, also run the manual native `Prototype` workflow.
+For build behavior changes, also run the manual native `Runtime candidates`
+workflow.
 Passing local checks is not evidence that another operating-system artifact
 builds or launches.

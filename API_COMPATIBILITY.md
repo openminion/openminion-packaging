@@ -1,7 +1,7 @@
 # OpenMinion Packaging Compatibility Policy
 
 Owner: `openminion-packaging`
-Status: private release-candidate contract
+Status: candidate contract
 Scope: build entrypoints, target identifiers, and emitted artifact metadata
 
 ## Supported operator surface
@@ -19,7 +19,7 @@ are repository-owned data.
 
 ## Stability
 
-This is a private candidate pipeline, so the command and candidate metadata
+This is a pre-stable candidate pipeline, so the command and candidate metadata
 contracts may change before the first stable binary publication.
 Changes must update the README, package docs, tests, and changelog together.
 

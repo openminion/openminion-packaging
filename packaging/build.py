@@ -206,7 +206,7 @@ def candidate_manifest(
     min_os_version: str,
     min_libc_version: str | None = None,
 ) -> dict:
-    """Describe verified candidate bytes privately, without claiming promotion."""
+    """Describe verified candidate bytes without claiming promotion."""
     artifacts = {"cli": cli_artifact, "daemon": daemon_artifact}
     metadata = {}
     for role, artifact in artifacts.items():
@@ -313,7 +313,7 @@ def merge_candidates(paths: list[Path], release_id: str) -> dict:
     ):
         raise ValueError("candidate records do not share one release identity")
     if first.get("promotion_status") != "candidate":
-        raise ValueError("only private candidate records can be merged")
+        raise ValueError("only candidate records can be merged")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", release_id):
         raise ValueError("invalid candidate release identity")
     artifacts = []

@@ -1,13 +1,13 @@
 # OpenMinion Standalone Packaging Releases
 
 Status: signed candidate and unsigned development publication enabled
-Last updated: 2026-10-08
+Last updated: 2026-10-19
 
-This repository produces private native release candidates. The
+This repository produces restricted native release candidates. The
 `Runtime candidates` workflow builds paired `openminion` and `openminiond`
 executables from the exact official OpenMinion wheel, verifies their bytes,
 starts the real daemon, probes `/health`, and records one cross-platform
-candidate identity in a private draft release.
+candidate identity in a draft release visible only to repository maintainers.
 
 The separate `Runtime development binaries` workflow builds and smoke-tests the
 same paired executables without signing. It exists so every final source release
@@ -21,19 +21,19 @@ Every request supplies the final three-part runtime version, full source commit,
 official production wheel URL, and SHA-256. The workflow independently checks
 those values against the immutable source tag and version-specific PyPI
 metadata before downloading or building. A successful final source release can
-request this private candidate automatically; that request grants no
+request this candidate automatically; that request grants no
 stable-publication authority.
 
-## Private Candidate Metadata
+## Candidate metadata
 
-After verifying an artifact, the existing builder can describe it for private
+After verifying an artifact, the existing builder can describe it for staged
 native qualification:
 
 ```bash
 python3.11 packaging/build.py candidate-manifest --help
 ```
 
-Supply its exact source commit, release identity, fixed private HTTPS artifact
+Supply its exact source commit, release identity, fixed restricted HTTPS artifact
 URLs, proposed Desktop bounds and native OS baseline. Linux also requires the
 proposed glibc minimum. The output always has `promotion_status: candidate`;
 proposed bounds are not certification. `merge-candidates` combines the three
@@ -104,12 +104,12 @@ Use this sequence after the final PyPI wheel and source tag are public:
    exact runtime version, source commit, wheel URL, and wheel SHA-256,
 2. require all three native jobs and the completion inventory to pass,
 3. transfer every `openminion` and `openminiond` executable, its `.json`
-   metadata, and its `.sha256` sidecar from the private draft to a public
+   metadata, and its `.sha256` sidecar from the restricted draft to a public
    `runtime-dev-v<version>-build.<number>` prerelease,
 4. add `runtime-release.json` and `SHA256SUMS`, clearly recording that signing,
    notarization, stable-feed promotion, and Desktop qualification are absent,
 5. download every public asset again and verify its SHA-256, and
-6. delete the temporary private draft only after the public readback passes.
+6. delete the temporary draft only after the public readback passes.
 
 This is the required binary disposition for a source release while signing is
 unavailable. It is intentionally separate from the signed candidate and
@@ -133,12 +133,40 @@ promotion sequence below.
    evidence PR reaches Desktop main may the separate protected OpenMinion
    metadata workflow advertise these bytes.
 
-Both packaging workflows fail closed unless dispatched from `main`. The
-packaging repository is private on GitHub Free, where required-reviewer
-environment rules are unavailable; manual dispatch plus the hard main-ref guard
-is the enforceable packaging approval boundary. The public OpenMinion metadata
-environment retains its required reviewer.
+All packaging workflows fail closed unless dispatched from `main`. Manual
+dispatch, the hard main-ref guard, and protected deployment environments are
+the packaging approval boundary. The public OpenMinion metadata environment
+retains its required reviewer.
 
 Do not add the central manifest dispatch back to this repository. Keeping asset
 publication and discoverability separate prevents an unqualified packaged
 Desktop/runtime pair from reaching clients.
+
+## Public repository conversion
+
+Repository visibility changes source access and Actions billing; it does not
+change artifact status or publication authority. Complete this checklist when
+the repository is made public:
+
+1. require pull requests and the passing `CI / Repository check` status for
+   `main` and `dev`, and block force pushes and branch deletion,
+2. retain read-only default workflow permissions and grant write permissions
+   only to the jobs that create restricted draft Releases,
+3. keep `Runtime candidates`, `Runtime development binaries`, and
+   `Runtime promotion` manual and guarded to `refs/heads/main`,
+4. configure required reviewers for `runtime-signing` and
+   `runtime-publication` before adding signing or publisher credentials,
+5. confirm that no signing certificate, notarization credential, publisher
+   private key, generated binary, wheel, or restricted evidence is tracked in
+   Git history,
+6. review existing draft Releases and delete obsolete transfer drafts after
+   their evidence is no longer needed,
+7. run `make check`, then dispatch one unsigned development build with an exact
+   production release identity and verify every public runtime asset after its
+   controlled transfer, and
+8. leave stable manifest publication disabled until the signed qualification
+   and Desktop compatibility gates above are satisfied.
+
+Public workflow logs and source code are expected. Draft Release assets remain
+restricted to repository maintainers until deliberately published or
+transferred to `openminion/runtime`.

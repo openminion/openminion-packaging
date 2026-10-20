@@ -18,9 +18,12 @@ Read:
 2. Add or update a behavior-focused test.
 3. Update public repository docs when an operator contract changes.
 4. Run `make check`.
-5. Run the native prototype workflow when build behavior or pinned inputs
+5. Run the native candidate workflow when build behavior or pinned inputs
    change.
 6. Include exact validation results in the pull request.
+
+Run `make release-check` when changing packaging, workflows, or public
+repository guidance.
 
 Do not commit `dist/`, `wheel/`, extracted runtimes, logs, credentials, signing
 material, or scratch evidence.
@@ -32,6 +35,8 @@ include `build`, `docs`, `fix`, `refactor`, `test`, and `chore`.
 
 Use a short title, a flat bullet summary, and a plain `Validation` section with
 the exact commands and results. Keep unrelated refactors out of the change.
+Open pull requests against `dev`; promote reviewed `dev` changes to `main`
+through a separate release or repository-maintenance pull request.
 
 ## Security and conduct
 

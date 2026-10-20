@@ -56,7 +56,7 @@ jobs:
           --source-commit "${{ inputs.source_commit }}"
           --wheel-url "${{ inputs.wheel_url }}"
           --wheel-sha256 "${{ inputs.wheel_sha256 }}"
-      - name: Create the private transfer release
+      - name: Create the restricted draft transfer release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -66,7 +66,7 @@ jobs:
             --draft \
             --target "$GITHUB_SHA" \
             --title "Runtime development binaries $tag" \
-            --notes "Temporary unsigned all-platform binaries for transfer to the public runtime prerelease."
+            --notes "Restricted draft containing temporary unsigned all-platform binaries for transfer to the public runtime prerelease."
           gh release upload "$tag" wheel/*.whl
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
@@ -170,7 +170,7 @@ jobs:
             echo '## Unsigned runtime development binaries ready'
             echo
             echo "- Version: \`$VERSION\`"
-            echo "- Private transfer tag: \`$TAG\`"
+            echo "- Draft transfer tag: \`$TAG\`"
             echo '- Targets: macOS arm64, Linux x86_64, Windows x86_64'
             echo '- Contents: paired CLI and daemon executables with metadata and checksums'
             echo '- Required next step: transfer to an explicitly unsigned prerelease in openminion/runtime and verify the public downloads'
