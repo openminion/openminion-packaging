@@ -15,6 +15,10 @@ Builds consume explicit wheel files, versions, and SHA-256 identities. Target
 metadata lives in `packaging/python-distributions.json`; dependency resolution
 is frozen in `packaging/locks/`.
 
+Map manual workflow inputs into environment variables and pass them as quoted
+arguments. Never interpolate a `workflow_dispatch` input directly into a shell
+script, especially in signing or publication jobs.
+
 ## Native builds
 
 Each executable is built on its target platform. Do not add cross-compilation

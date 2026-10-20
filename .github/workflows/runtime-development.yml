@@ -27,6 +27,11 @@ jobs:
   prepare:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
+    env:
+      RUNTIME_VERSION: ${{ inputs.runtime_version }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      WHEEL_URL: ${{ inputs.wheel_url }}
+      WHEEL_SHA256: ${{ inputs.wheel_sha256 }}
     permissions:
       contents: write
     outputs:
@@ -42,26 +47,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          test "$(gh api "repos/openminion/openminion/commits/v${{ inputs.runtime_version }}" --jq .sha)" = "${{ inputs.source_commit }}"
+          test "$(gh api "repos/openminion/openminion/commits/v${RUNTIME_VERSION}" --jq .sha)" = "$SOURCE_COMMIT"
           python packaging/build.py verify-release \
-            --version "${{ inputs.runtime_version }}" \
-            --source-commit "${{ inputs.source_commit }}" \
-            --wheel-url "${{ inputs.wheel_url }}" \
-            --wheel-sha256 "${{ inputs.wheel_sha256 }}"
+            --version "$RUNTIME_VERSION" \
+            --source-commit "$SOURCE_COMMIT" \
+            --wheel-url "$WHEEL_URL" \
+            --wheel-sha256 "$WHEEL_SHA256"
       - name: Download the exact production wheel
         run: >-
           python packaging/build.py download-wheel
           --output-dir wheel
-          --version "${{ inputs.runtime_version }}"
-          --source-commit "${{ inputs.source_commit }}"
-          --wheel-url "${{ inputs.wheel_url }}"
-          --wheel-sha256 "${{ inputs.wheel_sha256 }}"
+          --version "$RUNTIME_VERSION"
+          --source-commit "$SOURCE_COMMIT"
+          --wheel-url "$WHEEL_URL"
+          --wheel-sha256 "$WHEEL_SHA256"
       - name: Create the restricted draft transfer release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="runtime-development-v${{ inputs.runtime_version }}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tag="runtime-development-v${RUNTIME_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           gh release create "$tag" \
             --draft \
             --target "$GITHUB_SHA" \
@@ -83,6 +88,11 @@ jobs:
           - runner: ubuntu-22.04
             target: linux-x86_64
     runs-on: ${{ matrix.runner }}
+    env:
+      RUNTIME_VERSION: ${{ inputs.runtime_version }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      WHEEL_URL: ${{ inputs.wheel_url }}
+      WHEEL_SHA256: ${{ inputs.wheel_sha256 }}
     permissions:
       contents: write
     steps:
@@ -108,10 +118,10 @@ jobs:
         run: |
           wheel=$(find wheel -maxdepth 1 -name 'openminion-*.whl' -print -quit)
           release=(
-            --wheel-version "${{ inputs.runtime_version }}"
-            --wheel-url "${{ inputs.wheel_url }}"
-            --wheel-sha256 "${{ inputs.wheel_sha256 }}"
-            --source-commit "${{ inputs.source_commit }}"
+            --wheel-version "$RUNTIME_VERSION"
+            --wheel-url "$WHEEL_URL"
+            --wheel-sha256 "$WHEEL_SHA256"
+            --source-commit "$SOURCE_COMMIT"
           )
           python packaging/build.py lock --target "${{ matrix.target }}" --wheel "$wheel" "${release[@]}" --check
           python packaging/build.py build --target "${{ matrix.target }}" --wheel "$wheel" "${release[@]}"
@@ -129,7 +139,7 @@ jobs:
         run: |
           cli=$(find dist -maxdepth 1 -name 'openminion-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
           daemon=$(find dist -maxdepth 1 -name 'openminiond-*-${{ matrix.target }}*' ! -name '*.json' ! -name '*.sha256' -print -quit)
-          python packaging/smoke.py --cli "$cli" --daemon "$daemon" --version "${{ inputs.runtime_version }}"
+          python packaging/smoke.py --cli "$cli" --daemon "$daemon" --version "$RUNTIME_VERSION"
       - name: Stage the verified unsigned binaries
         shell: bash
         env:

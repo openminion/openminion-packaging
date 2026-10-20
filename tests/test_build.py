@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -390,6 +391,16 @@ class BuildContractTests(unittest.TestCase):
         )
         for lock in build.LOCKS_DIR.glob("*.txt"):
             self.assertNotIn(b"\r\n", lock.read_bytes())
+
+    def test_workflow_inputs_enter_shells_through_environment(self) -> None:
+        workflows = BUILD_PATH.parents[1] / ".github" / "workflows"
+        assignment = re.compile(
+            r"^\s+[A-Z][A-Z0-9_]*:\s+\$\{\{ inputs\.[a-z0-9_]+ \}\}\s*$"
+        )
+        for workflow in workflows.glob("*.yml"):
+            for line in workflow.read_text().splitlines():
+                if "${{ inputs." in line:
+                    self.assertRegex(line, assignment, workflow.name)
 
     def test_pyapp_environment_is_offline_and_isolated(self) -> None:
         target = build.load_target("macos-arm64")

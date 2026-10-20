@@ -1,12 +1,16 @@
 # OpenMinion Packaging Changelog
 
 Status: active
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 ## Unreleased
 
 - Aligned public documentation with the current CI, candidate, development,
   and promotion workflow boundaries.
+- Marked the tracked 0.0.29 locks and candidate run as historical qualification
+  evidence rather than current-release readiness.
+- Routed manual release inputs through quoted environment variables and added a
+  regression check against direct shell interpolation.
 - Prepared the repository for public source visibility without changing the
   candidate, signing, or stable-publication gates.
 - Replaced repository-privacy assumptions with explicit restricted-draft and
