@@ -166,7 +166,7 @@ jobs:
     needs: [prepare, build]
     runs-on: ubuntu-22.04
     permissions:
-      contents: read
+      contents: write # Reads the restricted draft Release inventory.
     steps:
       - name: Require every platform and executable
         env:
