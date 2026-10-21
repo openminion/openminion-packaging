@@ -105,7 +105,8 @@ Use this sequence after the final PyPI wheel and source tag are public:
 
 1. dispatch **Runtime development binaries** from packaging `main` with the
    exact runtime version, source commit, wheel URL, and wheel SHA-256,
-2. require all three native jobs and the completion inventory to pass,
+2. require each native job to download and verify that exact production wheel,
+   then require all three jobs and the completion inventory to pass,
 3. transfer every `openminion` and `openminiond` executable, its `.json`
    metadata, and its `.sha256` sidecar from the restricted draft to a public
    `runtime-dev-v<version>-build.<number>` prerelease,
