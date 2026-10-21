@@ -456,6 +456,16 @@ class BuildContractTests(unittest.TestCase):
             r"- name: Download the verified wheel\n\s+shell: bash\n\s+run:",
         )
 
+    def test_runtime_development_inventory_can_read_draft_release(self) -> None:
+        workflow = (
+            BUILD_PATH.parents[1] / ".github" / "workflows" / "runtime-development.yml"
+        ).read_text()
+        complete_job = workflow.split("\n  complete:\n", 1)[1]
+        self.assertRegex(
+            complete_job,
+            r"permissions:\n\s+contents: write",
+        )
+
     def test_pyapp_environment_is_offline_and_isolated(self) -> None:
         target = build.load_target("macos-arm64")
         values = build.pyapp_environment(
