@@ -111,6 +111,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Download the verified wheel
+        shell: bash
         run: >-
           python packaging/build.py download-wheel
           --output-dir wheel

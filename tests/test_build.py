@@ -447,6 +447,15 @@ class BuildContractTests(unittest.TestCase):
             for script in workflow_shell_scripts(workflow):
                 self.assertNotRegex(script, direct_shell_expansion, workflow.name)
 
+    def test_runtime_development_wheel_download_uses_bash(self) -> None:
+        workflow = (
+            BUILD_PATH.parents[1] / ".github" / "workflows" / "runtime-development.yml"
+        ).read_text()
+        self.assertRegex(
+            workflow,
+            r"- name: Download the verified wheel\n\s+shell: bash\n\s+run:",
+        )
+
     def test_pyapp_environment_is_offline_and_isolated(self) -> None:
         target = build.load_target("macos-arm64")
         values = build.pyapp_environment(
