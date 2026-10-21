@@ -73,11 +73,11 @@ jobs:
         run: |
           tag="runtime-development-v${RUNTIME_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
             --draft \
             --target "$GITHUB_SHA" \
             --title "Runtime development binaries $tag" \
             --notes "Restricted draft containing temporary unsigned all-platform binaries for transfer to the public runtime prerelease."
-          gh release upload "$tag" wheel/*.whl
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   build:
@@ -111,11 +111,13 @@ jobs:
         with:
           python-version: "3.11"
       - name: Download the verified wheel
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir wheel
-          gh release download "$TRANSFER_TAG" --pattern '*.whl' --dir wheel
+        run: >-
+          python packaging/build.py download-wheel
+          --output-dir wheel
+          --version "$RUNTIME_VERSION"
+          --source-commit "$SOURCE_COMMIT"
+          --wheel-url "$WHEEL_URL"
+          --wheel-sha256 "$WHEEL_SHA256"
       - name: Install pinned build tools
         run: |
           python -m pip install uv==0.9.21
@@ -154,6 +156,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "$TRANSFER_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
             dist/openminion-*-"$TARGET"* \
             dist/openminiond-*-"$TARGET"*
 
