@@ -34,7 +34,7 @@ The native candidate targets are:
 The build uses Python 3.11, `uv==0.9.21`, Rust `1.89.0`, and PyApp `0.29.0`.
 Run it only on the matching native platform.
 
-The tracked target locks are the last reviewed `0.1.9` qualification inputs,
+The tracked target locks are the last reviewed `0.1.10` qualification inputs,
 not an alias for the latest PyPI release. A different source release is
 intentionally rejected until a packaging PR refreshes and reviews every target
 lock from that release's exact wheel.
