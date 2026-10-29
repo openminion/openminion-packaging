@@ -1,7 +1,7 @@
 # OpenMinion Standalone Packaging Releases
 
 Status: release workflows implemented; tracked locks last qualify OpenMinion
-0.1.14; signed promotion not configured
+0.1.15; signed promotion not configured
 Last updated: 2026-10-28
 
 This repository produces restricted native release candidates. The
