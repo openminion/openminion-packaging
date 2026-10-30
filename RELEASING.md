@@ -2,7 +2,7 @@
 
 Status: release workflows implemented; tracked locks last qualify OpenMinion
 0.1.15; signed promotion not configured
-Last updated: 2026-10-28
+Last updated: 2026-10-30
 
 This repository produces restricted native release candidates. The
 `Runtime candidates` workflow builds paired `openminion` and `openminiond`
@@ -14,9 +14,9 @@ The separate `Runtime development binaries` workflow builds and smoke-tests the
 same paired executables without signing. It exists so every final source release
 can have complete macOS arm64, Linux x86_64, and Windows x86_64 binaries while
 signing is unavailable. Its outputs may be transferred only to an explicitly
-unsigned prerelease in `openminion/runtime`; they never enter the stable binary
-manifest and do not satisfy signing, native trust, Desktop compatibility, or
-automatic-update acceptance.
+unsigned normal GitHub Release in `openminion/runtime`; they never enter the
+stable binary manifest and do not satisfy signing, native trust, Desktop
+compatibility, or automatic-update acceptance.
 
 Every request supplies the final three-part runtime version, full source commit,
 official production wheel URL, and SHA-256. The workflow independently checks
@@ -108,12 +108,14 @@ Use this sequence after the final PyPI wheel and source tag are public:
 2. require each native job to download and verify that exact production wheel,
    then require all three jobs and the completion inventory to pass,
 3. transfer every `openminion` and `openminiond` executable, its `.json`
-   metadata, and its `.sha256` sidecar from the restricted draft to a public
-   `runtime-dev-v<version>-build.<number>` prerelease,
+   metadata, and its `.sha256` sidecar from the restricted draft to a normal
+   public GitHub Release tagged `runtime-dev-v<version>-build.<number>`,
 4. include the reviewed third-party license inventory and required notices for
    the exact bundled dependency set,
-5. add `runtime-release.json` and `SHA256SUMS`, clearly recording that signing,
-   notarization, stable-feed promotion, and Desktop qualification are absent,
+5. add `runtime-release.json` and `SHA256SUMS`, publish with
+   `prerelease=false`, mark the newest runtime build as `latest`, and clearly
+   record that signing, notarization, stable-feed promotion, and Desktop
+   qualification are absent,
 6. download every public asset again and verify its SHA-256, and
 7. delete the temporary draft only after the public readback passes.
 
