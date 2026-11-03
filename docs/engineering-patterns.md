@@ -46,3 +46,6 @@ current build contract needs it.
 Candidate artifacts are unsigned and temporary. Do not describe them as
 certified, released, or supported until the corresponding release gates exist
 and pass.
+
+Apply the [comment and docstring review](../CODE_QUALITY.md#comment-and-docstring-review)
+to the final diff, including tests and scripts.
