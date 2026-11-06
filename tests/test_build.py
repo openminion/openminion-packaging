@@ -466,6 +466,13 @@ class BuildContractTests(unittest.TestCase):
             r"permissions:\n\s+contents: write",
         )
 
+    def test_native_workflows_use_supported_macos_runner(self) -> None:
+        workflows = BUILD_PATH.parents[1] / ".github" / "workflows"
+        for name in ("runtime-candidates.yml", "runtime-development.yml"):
+            workflow = (workflows / name).read_text()
+            self.assertIn("runner: macos-15", workflow)
+            self.assertNotIn("runner: macos-14", workflow)
+
     def test_pyapp_environment_is_offline_and_isolated(self) -> None:
         target = build.load_target("macos-arm64")
         values = build.pyapp_environment(
